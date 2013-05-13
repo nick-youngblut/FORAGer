@@ -20,7 +20,7 @@ my $gene_extend = 100;
 my $fork = 0;
 my $outdir_name = "Mapped2Cluster";
 GetOptions(
-		"index=s" => \$index_in, 		# an index file of sam_file => FIG#
+		"index=s" => \$index_in, 		# an index file of sam_file => FIG_of_ref-genome
 		"extend=i" => \$gene_extend,	# bp to extend beyond gene (5' & 3')
 		"outdir=s" => \$outdir_name, 	# name of output directory
 		"fork=i" => \$fork,				# number of forked processes
@@ -48,8 +48,6 @@ foreach my $query_reads (keys %$index_r){		# each query genome
 
 	# making tmp data directory #
 	my $tmp_dir = File::Spec->tmpdir();
-		#rmtree($tmp_dir) if -d $tmp_dir;
-		#mkdir $tmp_dir or die $!;
 	
 	# foreach SAM file # 
 	foreach my $sam_file (keys %{$index_r->{$query_reads}}){
