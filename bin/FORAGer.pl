@@ -15,7 +15,7 @@ use Parallel::ForkManager;
 ### args/flags
 pod2usage("$0: No files given.") if ((@ARGV == 0) && (-t STDIN));
 
-my ($verbose, @sam_in, $index_in, $rev_comp_bool, $warnings_bool);
+my ($verbose, @sam_in, $index_in, $warnings_bool);
 my $gene_extend = 100;
 my $fork = 0;
 my $outdir_name = "Mapped2Cluster";
@@ -24,7 +24,6 @@ GetOptions(
 		"extend=i" => \$gene_extend,	# bp to extend beyond gene (5' & 3')
 		"outdir=s" => \$outdir_name, 	# name of output directory
 		"fork=i" => \$fork,				# number of forked processes
-		"bitwise" => \$rev_comp_bool, 		# use SAM bit flag to rev/rev-comp reads? [FALSE]
 		"warnings" => \$warnings_bool, 	# write warnings to STDERR? [TRUE]
 	   "verbose" => \$verbose,
 	   "help|?" => \&pod2usage # Help
@@ -87,9 +86,6 @@ foreach my $query_reads (keys %$index_r){		# each query genome
 	my $outdir_name_e = make_outdir($outdir_name, $query_reads);
 	write_reads_mapped($mapped_r, $outdir_name_e);
 	write_summary_table($summary_r, $outdir_name_e);
-
-	# cleaning up #
-		#rmtree($tmp_dir) if -d $tmp_dir;
 	}
 
 
@@ -299,11 +295,12 @@ sub load_interval_tree{
 	
 	# status #
 	print STDERR "...loading $sam_file\n" unless $verbose;
+	my $fh = open_file($sam_file);
 	
 	# loading reads as hash #
-	open IN, $sam_file or die $!;
+		#open IN, $sam_file or die $!;
 	my %reads;			# contig ->  read_name -> map_ID -> category -> value
-	while(<IN>){
+	while(<$fh>){
 		chomp;
 		next if /^@/; 	# skipping header
 		next if /^\s*$/;	# skipping blank lines
@@ -318,10 +315,6 @@ sub load_interval_tree{
 			my $line2 = <IN>;		# loading pair
 			my @line2 = split /\t/, $line2;
 			
-			## check bitwise flag; read back to original orientation ##
-			check_bitwise(\@line) if $rev_comp_bool;
-			check_bitwise(\@line2) if $rev_comp_bool;
-			
 			## loading into hash ##
 				# start & stop by + strand
 			$reads{$line[2]}{$line[0]}{1}{$.}{"start"} = $line[3];						# contig->seq->start
@@ -333,16 +326,13 @@ sub load_interval_tree{
 			$reads{$line2[2]}{$line2[0]}{2}{$.}{"nuc"} = $line2[9];			
 			}	
 		else{ 
-			## check bitwise flag; read back to original orientation ##
-			check_bitwise(\@line) if $rev_comp_bool;
-
 			## loading into hash ##
 			$reads{$line[2]}{$line[0]}{1}{$.}{"start"} = $line[3];						# contig->seq->start
 			$reads{$line[2]}{$line[0]}{1}{$.}{"stop"} = $line[3] + length $line[9];		
 			$reads{$line[2]}{$line[0]}{1}{$.}{"nuc"} = $line[9];	
 			}
 		}
-	close IN;
+	close $fh;
 	
 	# loading interval tree #
 	my %itrees;
@@ -364,32 +354,26 @@ sub load_interval_tree{
 	return \%itrees, \%reads;
 	}
 	
-sub check_bitwise{
-# checking bitwise flag in sam file line #
-## rev or rev-comp sequence if needed ##
-## returns read back to original orientation (for assembly) ##
-## input = array-ref ##
-	my ($arr_r) = @_;
+sub open_file{
+# check for compression; open depending on the file extension; return filehandle #
+	my $file = shift;
 	
-	if($$arr_r[1] & 10){	# reverse
-		$$arr_r[9] = reverse($$arr_r[9]);
+	my $fh;
+	if(-B $file and $file =~ /tgz$|tar.gz$/){		# if file is compressed
+		open($fh, "-|", "zcat $file | tar  -O -xf -") or die $!;
 		}
-	elsif($$arr_r[1] & 20){	# rev-comp
-		$$arr_r[9] = revcomp($$arr_r[9]);
+	elsif(-B $file and $file =~ /.gz$/){			# if file is gzipped
+		open($fh, "-|", "zcat $file") or die $!;
 		}
+	else{
+		open $fh, $file or die $!;
+		}
+	
+	return $fh;
 	}
 
-sub revcomp{
-        # reverse complements DNA #
-        my $seq = shift;
-        $seq = reverse($seq);
-                #$seq =~ tr/[a-z]/[A-Z]/;
-        $seq =~ tr/ACGTNBVDHKMRYSWacgtnbvdhkmrysw\.-/TGCANVBHDMKYRSWtgcanvbhdmkyrsw\.-/;
-        return $seq;
-        }
-
 sub load_index{
-# loading index file (sam => FIG#) #
+# loading index file (query => sam => FIG#) #
 	my ($index_in) = @_;
 	
 	open IN, $index_in or die $!;
@@ -406,10 +390,10 @@ sub load_index{
 
 		# loading hash #
 		if($line[2]){	# if query name provided
-			$index{$line[2]}{$line[0]} = $line[1];	# outdir => sam => fig
+			$index{$line[2]}{$line[0]} = $line[1];			# query => sam => subject_fig
 			}
 		else{
-			$index{"SINGLE_QUERY"}{$line[0]} = $line[1];		# outdir => sam => fig
+			$index{"SINGLE_QUERY"}{$line[0]} = $line[1];	# query => sam => subject_fig
 			}
 		}
 	close IN;
@@ -543,11 +527,17 @@ Number of SAM files to process in parallel. [1]
 
 Use SAM bitwise flag to return read to original orientation (i.e. rev/rev-comp read)
 
-=item -v	Verbose output. [TRUE]
+=item -verbose
 
-=item -w 	Warnings? [TRUE]
+Verbose output. [TRUE]
 
-=item -h	This help message
+=item -warnings
+
+Display warnings. [TRUE]
+
+=item -help
+
+This help message.
 
 =back
 

@@ -75,7 +75,7 @@ foreach my $org (keys %$qlist_r){			# each set of read files
 								$outdir);
 		
 		# writing out 
-		print join("\t", $org, $fig, $sam_out), "\n";
+		print join("\t", $sam_out, $fig, $org), "\n";
 						
 		# end fork #
 		$pm->finish;
@@ -239,9 +239,13 @@ Parameters appended to '-params'. []
 
 Number of parallel calls of bowtie2. [1]
 
-=item -v	Verbose output
+=item -verbose
 
-=item -h	This help message
+Verbose output. [TRUE]
+
+=item -help
+
+This help message.
 
 =back
 
@@ -260,7 +264,7 @@ By default, the top 10 hits for each read are kept (bowtie2 param: '-k 10').
 
 =head2 'sam_index.txt'
 
-3 columns: query_organism_name, subject_FIG_ID, sam_file
+3 columns: sam_file, subject_FIG_ID, query_organism_name
 
 =head1 EXAMPLES
 
