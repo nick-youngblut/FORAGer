@@ -15,7 +15,7 @@ use Parallel::ForkManager;
 ### args/flags
 pod2usage("$0: No files given.") if ((@ARGV == 0) && (-t STDIN));
 
-my ($verbose, @sam_in, $index_in, $warnings_bool);
+my ($verbose, @sam_in, $index_in, $warnings_bool, $write_seqs_bool);
 my $gene_extend = 100;
 my $fork = 0;
 my $outdir_name = "Mapped2Cluster";
@@ -25,6 +25,7 @@ GetOptions(
 		"outdir=s" => \$outdir_name, 	# name of output directory
 		"fork=i" => \$fork,				# number of forked processes
 		"warnings" => \$warnings_bool, 	# write warnings to STDERR? [TRUE]
+		"sequence" => \$write_seqs_bool, 	# writing fasta for each cluter [TRUE]
 	   "verbose" => \$verbose,
 	   "help|?" => \&pod2usage # Help
 	   );
@@ -37,7 +38,7 @@ die " ERROR: provide an index file!\n" unless $index_in;
 my $index_r = load_index($index_in);
 
 # loading info from ITEP #
-my $gene_start_stop_r = load_gene_info($index_r);
+my $gene_start_stop_r = load_gene_info($index_r, $write_seqs_bool);
 
 # foreach query #
 my $pm = new Parallel::ForkManager($fork);
@@ -312,7 +313,7 @@ sub load_interval_tree{
 		
 		## paired end info ##
 		if($line[6] eq "="){ 		# if pair mapping
-			my $line2 = <IN>;		# loading pair
+			my $line2 = <$fh>;		# loading pair
 			my @line2 = split /\t/, $line2;
 			
 			## loading into hash ##
@@ -404,10 +405,11 @@ sub load_index{
 
 sub load_gene_info{
 # getting geneIDs for a cluster from ITEP #
-	my ($index_r) = @_;
+	my ($index_r, $write_seqs_bool) = @_;
 
 	# parsing ITEP output #
 	my %gene_start_stop;
+	my (%fna, %faa);		# fasta ouput of clusters (nuc & aa)
 	while(<>){
 		chomp;
 		next if /^\s*$/;
@@ -430,11 +432,22 @@ sub load_gene_info{
 			$gene_start_stop{$fig}{$line[13]}{$line[4]}{"stop"} = $line[5];
 			}
 		else{ die " ERROR: 'strand' must be '+' or '-'\n"; }
+		
+		## loading sequences ##
+		$fna{$line[13]}{$line[0]} = $line[11];
+		$faa{$line[13]}{$line[0]} = $line[12];
 		}
 	
 	# sanity check #
 	die " ERROR: no gene information found for gene clusters!\n" if
 		scalar keys %gene_start_stop == 0;
+	
+	# writing out fasta files #
+	unless($write_seqs_bool){
+		write_cluster_fasta(\%fna, "nuc");
+		write_cluster_fasta(\%faa, "aa");
+		print STDERR "\n" unless $verbose;
+		}
 	
 	# counting clusters (in provided FIGs) #
 	## getting all figs ##
@@ -457,6 +470,35 @@ sub load_gene_info{
 	return \%gene_start_stop;		# fig=>cluster=>contig=>start/stop=>value
 	}
 
+sub write_cluster_fasta{
+# writing fasta files for each cluster #
+	my ($fasta_r, $type) = @_;
+
+	# variables by types
+	my $outdir;
+	if($type eq "nuc"){ $outdir = "cluster_nuc";}
+	elsif($type eq "aa"){ $outdir = "cluster_aa"; }
+	else{ die " LOGIC ERROR: $!\n"; }
+	
+	# making directory #
+	$outdir = File::Spec->rel2abs($outdir);
+	rmtree($outdir) if -d $outdir;
+	mkdir $outdir or die $!;
+	
+	# writing cluster fasta files #
+	foreach my $clust (keys %$fasta_r){
+		open OUT, ">$outdir/clust$clust.fasta" or die $!;
+		
+		foreach my $seq (keys %{$fasta_r->{$clust}}){
+			print OUT join("\n", ">$seq", $fasta_r->{$clust}{$seq}), "\n";
+			}
+		close OUT;
+		}
+		
+	# status #
+	print STDERR "...fasta for each cluster written to $outdir\n" unless $verbose;
+	}
+
 sub load_cluster_ids{
 # loading cluster_id file in 'ITEP' format #
 	my ($clusterID_col) = @_;
@@ -473,7 +515,7 @@ sub load_cluster_ids{
 
 		die " ERROR: no clusters provided!\n" if scalar keys %clusterID == 0;
 		
-		print STDERR "Number of clusters provided: ", scalar keys %clusterID, "\n"
+		print STDERR "Number of clusters provided: ", scalar keys %clusterID, "\n\n"
 			unless $verbose;
 
 		#print Dumper %clusterID; exit;
