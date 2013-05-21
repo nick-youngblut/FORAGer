@@ -163,9 +163,11 @@ Number of parallel cluster comparisons to perform. [1]
 .IP "\-truncate" 4
 .IX Item "-truncate"
 Truncate contigs to the longest tblastn hit ('F'=FALSE; provided value added to range)? [0]
+.IP "\-x 	Write header for presence-absence table? [\s-1FALSE\s0]" 4
+.IX Item "-x 	Write header for presence-absence table? [FALSE]"
+.PD 0
 .IP "\-v	Verbose output. [\s-1TRUE\s0]" 4
 .IX Item "-v	Verbose output. [TRUE]"
-.PD 0
 .IP "\-h	This help message" 4
 .IX Item "-h	This help message"
 .PD
@@ -197,6 +199,8 @@ Query file name
 .IP "\(bu" 4
 Cluster file name
 .IP "\(bu" 4
+Query contig name
+.IP "\(bu" 4
 Presence/Absence (binary)
 .IP "\(bu" 4
 Number tblastn hits \s-1PASS/FAIL\s0
@@ -209,7 +213,7 @@ Length \s-1PASS/FAIL\s0
 .IP "\(bu" 4
 tblastn hit length range (min:max * \-length)
 .IP "\(bu" 4
-Cluster length (min:max)
+Cluster length range (min:max)
 .IP "\(bu" 4
 Normalized bit score \s-1PASS/FAIL\s0
 .IP "\(bu" 4
