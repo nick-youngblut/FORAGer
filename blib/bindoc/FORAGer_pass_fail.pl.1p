@@ -130,12 +130,18 @@
 .if n .ad l
 .nh
 .SH "NAME"
-template.pl \-\- script template
+FORAGer_pass_fail.pl \-\- investigate Passing/Failing of contigs
 .SH "SYNOPSIS"
 .IX Header "SYNOPSIS"
-template.pl [options] < input > output
+FORAGer_screen.pl | FORAGer_pass_fail.pl [options]
 .SS "options"
 .IX Subsection "options"
+.IP "\-fail" 4
+.IX Item "-fail"
+Write out all failed contig lines
+.IP "\-pass" 4
+.IX Item "-pass"
+Write out all passed contig lines
 .IP "\-v	Verbose output" 4
 .IX Item "-v	Verbose output"
 .PD 0
@@ -144,27 +150,22 @@ template.pl [options] < input > output
 .PD
 .SS "For more information:"
 .IX Subsection "For more information:"
-perldoc template.pl
+perldoc FORAGer_pass_fail.pl
 .SH "DESCRIPTION"
 .IX Header "DESCRIPTION"
-The flow of execution is roughly:
-   1) Step 1
-   2) Step 2
-   3) Step 3
+Investigate which contigs produced by the FORAGer pipeline
+have passed or failed the screening processes.
 .SH "EXAMPLES"
 .IX Header "EXAMPLES"
 .SS "Usage method 1"
 .IX Subsection "Usage method 1"
-template.pl <read1.fastq> <read2.fastq> <output directory or basename>
-.SS "Usage method 2"
-.IX Subsection "Usage method 2"
-template.pl <library file> <output directory or basename>
+FORAGer_pass_fail.pl \-p < WWM610_pres\-abs_summary.txt
 .SH "AUTHOR"
 .IX Header "AUTHOR"
 Nick Youngblut <nyoungb2@illinois.edu>
 .SH "AVAILABILITY"
 .IX Header "AVAILABILITY"
-sharchaea.life.uiuc.edu:/home/git/
+sharchaea.life.uiuc.edu:/home/git/FORAGer/
 .SH "COPYRIGHT"
 .IX Header "COPYRIGHT"
 Copyright 2010, 2011
