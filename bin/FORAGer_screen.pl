@@ -182,12 +182,12 @@ sub write_PA_table{
 # writing out PA table to STDOUT #
 	my ($clust_file, $summary_r, $contig_dir) = @_;
 	
-	my @stats = qw/Query_contigs PA N_tblastn_hits_cutoff N_tblastn_hits N_cluster_genes length_cutoff hit_length_range cluster_length_range norm_bit_score min_bit_score bit_score_cutoff/;
+	my @stats = qw/PA N_tblastn_hits_cutoff N_tblastn_hits N_cluster_genes length_cutoff hit_length_range cluster_length_range norm_bit_score min_bit_score bit_score_cutoff/;
 	
 	# writing body #
 	if($summary_r){	# no contig file, failed assembly
 		foreach my $contig (keys %$summary_r){
-			print join("\t", $contig_dir, $clust_file, $contig);
+			print join("\t", $contig_dir, $clust_file, $contig);			# query, cluster file name, contig_name
 			map{exists $summary_r->{$contig}{$_} ? print "\t$summary_r->{$contig}{$_}" : print "\tNA" } @stats;
 			print "\n";
 			}

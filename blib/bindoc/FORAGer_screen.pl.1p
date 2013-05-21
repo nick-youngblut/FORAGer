@@ -199,17 +199,23 @@ Cluster file name
 .IP "\(bu" 4
 Presence/Absence (binary)
 .IP "\(bu" 4
-Cutoff for tblastn hits
+Number tblastn hits \s-1PASS/FAIL\s0
 .IP "\(bu" 4
 Number of tblastn hits
 .IP "\(bu" 4
-Length cutoff
+Number of genes in cluster
 .IP "\(bu" 4
-Length range (min:max)
+Length \s-1PASS/FAIL\s0
 .IP "\(bu" 4
-Normalized bit score
+tblastn hit length range (min:max * \-length)
+.IP "\(bu" 4
+Cluster length (min:max)
+.IP "\(bu" 4
+Normalized bit score \s-1PASS/FAIL\s0
 .IP "\(bu" 4
 Minimum normalized bit score
+.IP "\(bu" 4
+Normalized bit score cutoff
 .SH "EXAMPLES"
 .IX Header "EXAMPLES"
 .SS "Basic Usage:"

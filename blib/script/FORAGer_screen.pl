@@ -182,7 +182,7 @@ sub write_PA_table{
 # writing out PA table to STDOUT #
 	my ($clust_file, $summary_r, $contig_dir) = @_;
 	
-	my @stats = qw/Query_contigs PA N_tblastn_hits_cutoff N_tblastn_hits length_cutoff hit_length_range norm_bit_score min_bit_score/;
+	my @stats = qw/Query_contigs PA N_tblastn_hits_cutoff N_tblastn_hits N_cluster_genes length_cutoff hit_length_range cluster_length_range norm_bit_score min_bit_score bit_score_cutoff/;
 	
 	# writing body #
 	if($summary_r){	# no contig file, failed assembly
@@ -217,6 +217,7 @@ sub filter_by_bitscore{
 				$summary_r->{$subject}{"norm_bit_score"} = "FAILED";
 				}
 			$summary_r->{$subject}{"min_bit_score"} = sprintf("%.3f", $x);
+			$summary_r->{$subject}{"bit_score_cutoff"} = sprintf("%.3f", $bit_cutoff);
 			}
 		else{
 			$summary_r->{$subject}{"norm_bit_score"} = "NA";
@@ -249,8 +250,8 @@ sub filter_by_length{
 				}
 				
 			## hit length range ##
-			my $hit_range = join(":", sprintf("%.0f", min(@hit_lens)), 
-									sprintf("%.0f", max(@hit_lens)));
+			$summary_r->{$contig}{"hit_length_range"} = join(":", sprintf("%.0f", min(@hit_lens)), 
+												sprintf("%.0f", max(@hit_lens)));		
 			
 			# pass/fail length cutoff #
 			if($N_passed == scalar keys %$clusters_r){		# all hits must pass
@@ -260,13 +261,16 @@ sub filter_by_length{
 				$summary_r->{$contig}{"PA"} = 0;
 				$summary_r->{$contig}{"length_cutoff"} = "FAILED";
 				}
-			$summary_r->{$contig}{"hit_length_range"} = $hit_range;
 			}
-		else{					# no tblastn hits at all
+		else{								# no tblastn hits at all
 			$summary_r->{$contig}{"length_cutoff"} = "NA";
 			$summary_r->{$contig}{"hit_length_range"} = "NA";			
 			$summary_r->{$contig}{"PA"} = 0 if $len_cutoff; 		# no tblastn hits, so not PASSING
 			}
+		
+		## cluster length range ##
+		$summary_r->{$contig}{"cluster_length_range"} = join(":", sprintf("%.0f", $$clust_range_r[0]), 
+															sprintf("%.0f",$$clust_range_r[1]));	
 		}
 		#print Dumper $summary_r; exit;
 	}
@@ -292,6 +296,7 @@ sub filter_by_Nhits{
 			$summary_r->{$contig}{"N_tblastn_hits_cutoff"} = "FAILED";				
 			$summary_r->{$contig}{"N_tblastn_hits"} = 0;		
 			}
+		$summary_r->{$contig}{"N_cluster_genes"} = $N_genes;
 		}
 	}
 
@@ -557,17 +562,23 @@ Presence-absence summary written to STDOUT. "NA" = not applicable.
 
 =item * 	Presence/Absence (binary)
 
-=item * 	Cutoff for tblastn hits
+=item * 	Number tblastn hits PASS/FAIL
 
 =item * 	Number of tblastn hits
 
-=item * 	Length cutoff
+=item * 	Number of genes in cluster
 
-=item * 	Length range (min:max)
+=item * 	Length PASS/FAIL
 
-=item * 	Normalized bit score
+=item * 	tblastn hit length range (min:max * -length)
+
+=item * 	Cluster length (min:max)
+
+=item * 	Normalized bit score PASS/FAIL
 
 =item * 	Minimum normalized bit score
+
+=item * 	Normalized bit score cutoff
 
 =back
 
