@@ -14,7 +14,7 @@ use List::Util qw/max min/;
 ### args/flags
 pod2usage("$0: No files given.") if ((@ARGV == 0) && (-t STDIN));
 
-my ($verbose, $nuc_clust_dir, $aa_clust_dir, @contig_dirs, $write_cluster);
+my ($verbose, $nuc_clust_dir, $aa_clust_dir, @contig_dirs, $write_cluster, $header_bool);
 my $fork = 0;
 my $len_cutoff = 1.25;			# range expansion factor
 my $floor = 9;					# min range (bp)
@@ -29,6 +29,7 @@ GetOptions(
 	   "minimum=i" => \$floor,				# min range (bp)
 	   "write" => \$write_cluster, 			# write cluster w/ contig
 	   "truncate=s" => \$truncate, 			# truncating 
+	   "x" => \$header_bool, 				# write header? [FALSE]
 	   "fork=i" => \$fork,
 	   "verbose" => \$verbose,
 	   "help|?" => \&pod2usage # Help
@@ -44,6 +45,8 @@ die " ERROR: provide >=1 directory containing FORAGer contig files (1 directory 
 map{ die " ERROR: $_ not found!\n" unless -d $_; $_=File::Spec->rel2abs($_)} ($nuc_clust_dir, $aa_clust_dir, @contig_dirs);
 
 ### MAIN
+write_header() if $header_bool;
+
 my $pm = new Parallel::ForkManager($fork);
 foreach my $contig_dir (@contig_dirs){
 	# loading files #
@@ -106,6 +109,12 @@ $pm->wait_all_children;
 
 
 ### Subroutines
+sub write_header{
+# writing the header to the PA table #
+	my @header = qw|Query_file_name Cluster_file_name Query_contig_name Presence/Absence_(binary) Number_tblastn_hits_PASS/FAIL Number_of_tblastn_hits Number_of_genes_in_cluster Length_PASS/FAIL tblastn_hit_length_range Cluster_length_range Normalized_bit_score_PASS/FAIL Minimum_normalized_bit_score Normalized_bit_score_cutoff|;
+	print join("\t", @header), "\n";
+	}
+
 sub truncate_contigs{
 # truncating contigs to max tblastn length #
 	my ($contigs_r, $tblastn_r, $truncate) = @_;
@@ -520,6 +529,8 @@ Number of parallel cluster comparisons to perform. [1]
 
 Truncate contigs to the longest tblastn hit ('F'=FALSE; provided value added to range)? [0] 
 
+=item -x 	Write header for presence-absence table? [FALSE]
+
 =item -v	Verbose output. [TRUE]
 
 =item -h	This help message
@@ -560,6 +571,8 @@ Presence-absence summary written to STDOUT. "NA" = not applicable.
 
 =item * 	Cluster file name
 
+=item * 	Query contig name
+
 =item * 	Presence/Absence (binary)
 
 =item * 	Number tblastn hits PASS/FAIL
@@ -572,7 +585,7 @@ Presence-absence summary written to STDOUT. "NA" = not applicable.
 
 =item * 	tblastn hit length range (min:max * -length)
 
-=item * 	Cluster length (min:max)
+=item * 	Cluster length range (min:max)
 
 =item * 	Normalized bit score PASS/FAIL
 
