@@ -312,7 +312,7 @@ sub load_interval_tree{
 		next if $line[3] eq "" || $line[3] == 0;		# if not mapped
 		
 		## paired end info ##
-		if($line[6] eq "="){ 		# if pair mapping
+		if($line[6] eq "=" and ! eof($fh) ){ 		# if pair mapping
 			my $line2 = <$fh>;		# loading pair
 			my @line2 = split /\t/, $line2;
 			
