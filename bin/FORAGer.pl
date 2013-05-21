@@ -25,7 +25,7 @@ GetOptions(
 		"outdir=s" => \$outdir_name, 	# name of output directory
 		"fork=i" => \$fork,				# number of forked processes
 		"warnings" => \$warnings_bool, 	# write warnings to STDERR? [TRUE]
-		"sequence" => \$write_seqs_bool, 	# writing fasta for each cluter [TRUE]
+		"sequences" => \$write_seqs_bool, 	# writing fasta for each cluter [TRUE]
 	   "verbose" => \$verbose,
 	   "help|?" => \&pod2usage # Help
 	   );
@@ -434,8 +434,8 @@ sub load_gene_info{
 		else{ die " ERROR: 'strand' must be '+' or '-'\n"; }
 		
 		## loading sequences ##
-		$fna{$line[13]}{$line[0]} = $line[11];
-		$faa{$line[13]}{$line[0]} = $line[12];
+		$fna{$line[13]}{$line[0]} = $line[10];
+		$faa{$line[13]}{$line[0]} = $line[11];
 		}
 	
 	# sanity check #
@@ -457,7 +457,8 @@ sub load_gene_info{
 			push(@figs, $index_r->{$q}{$sam});
 			}
 		}
-
+	
+	## counting clusters ##
 	my %cnt;
 	foreach my $fig (@figs){
 		print STDERR " WARNING: FIG $fig not found in provided gene cluster info!\n"
@@ -557,6 +558,11 @@ Output directory name (location of all mapped read files).
 For multiple queries, querie names will be appended to the directory
 name. [./Mapped2Cluster/]
 
+=item -sequences
+
+Write out fasta nucleotide & amino acid files for all gene clusters
+provided? [TRUE]
+
 =item -extend
 
 Number of base pairs to extend around the gene of interest (5' & 3'). [100]
@@ -564,10 +570,6 @@ Number of base pairs to extend around the gene of interest (5' & 3'). [100]
 =item -fork
 
 Number of SAM files to process in parallel. [1]
-
-=item -bitwise
-
-Use SAM bitwise flag to return read to original orientation (i.e. rev/rev-comp read)
 
 =item -verbose
 
