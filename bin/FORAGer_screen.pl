@@ -131,7 +131,8 @@ sub truncate_contigs{
 			}
 		
 		# truncating #
-		$contigs_r->{$contig} = substr($contigs_r->{$contig}, $start_stop[0], $start_stop[1]);
+		$contigs_r->{$contig} = substr($contigs_r->{$contig}, $start_stop[0], $start_stop[1])
+			if @start_stop;
 		}
 	}
 
