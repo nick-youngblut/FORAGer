@@ -8,6 +8,7 @@ use Data::Dumper;
 use Getopt::Long;
 use File::Spec;
 use File::Path;
+use File::Temp qw/ tempdir /;
 use Set::IntervalTree;
 use Storable;
 use Parallel::ForkManager;
@@ -47,9 +48,10 @@ foreach my $query_reads (keys %$index_r){		# each query genome
 		unless $query_reads eq "SINGLE_QUERY";
 
 	# making tmp data directory #
-	my $tmp_dir = File::Spec->tmpdir();
+	my $tmp_dir_o = File::Temp->newdir();
+	my $tmp_dir = $tmp_dir_o->dirname;
 	
-	# foreach SAM file # 
+	# foreach SAM file (can fork & merge) # 
 	foreach my $sam_file (keys %{$index_r->{$query_reads}}){
 		my (%reads_mapped, %mapped_summary);
 	

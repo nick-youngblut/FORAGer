@@ -104,6 +104,7 @@ sub write_fails{
 			$fail_sum{$query}{"Nhit"}{"fail"} = 0 unless $fail_sum{$query}{"Nhit"}{"fail"};
 			$fail_sum{$query}{"length"}{"fail"} = 0 unless $fail_sum{$query}{"length"}{"fail"};
 			$fail_sum{$query}{"bitscore"}{"fail"} = 0 unless $fail_sum{$query}{"bitscore"}{"fail"};
+			
 			$fail_sum{$query}{"Nhit"}{"NA"} = 0 unless $fail_sum{$query}{"Nhit"}{"NA"};
 			$fail_sum{$query}{"length"}{"NA"} = 0 unless $fail_sum{$query}{"length"}{"NA"};
 			$fail_sum{$query}{"bitscore"}{"NA"} = 0 unless $fail_sum{$query}{"bitscore"}{"NA"};
