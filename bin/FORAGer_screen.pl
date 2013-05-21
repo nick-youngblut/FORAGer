@@ -318,14 +318,17 @@ sub get_clust_len_range{
 
 	# getting stdev of lengths #
 	my $N = scalar @lens;
-	if($N > 1){  
+	if($N > 1){  			# if >1 gene in cluster
 		my $min = min(@lens) - 3;
 		my $max = max(@lens);
 		my $range = $max - $min;
-		$range = $floor if $range < $floor; 				# floor of range
-		my $exp = (($range * $len_cutoff) - $range)/2;		# expansion of range
-		$exp += ($floor - ($max - $min))/2 if $range < $floor; 
-		return [$min - $exp, $max + $exp];					# range +/- expansion
+		$range = $floor if $range < $floor; 							# floor of range
+		my $exp = (($range * $len_cutoff) - $range)/2;					# expansion of range
+		$exp += ($floor - ($max - $min))/2 if $max - $min < $floor; 	# adding to min/max of range
+			#print Dumper $range;
+			#print Dumper $exp; 
+			#print Dumper $min - $exp, $max + $exp if ($max + $exp) - ($min - $exp) < 9;
+		return [$min - $exp, $max + $exp];						# range +/- expansion
 		}		# if >1 peg in cluster, max - min
 	else{ return [($lens[0] -3) * 0.75, $lens[0] * 1.25]; }	# just length of the gene +/- 0.25%
 	}
@@ -583,9 +586,9 @@ Presence-absence summary written to STDOUT. "NA" = not applicable.
 
 =item * 	Length PASS/FAIL
 
-=item * 	tblastn hit length range (min:max * -length)
+=item * 	tblastn hit length range (min:max)
 
-=item * 	Cluster length range (min:max)
+=item * 	Cluster length range (min:max * '-length')
 
 =item * 	Normalized bit score PASS/FAIL
 
