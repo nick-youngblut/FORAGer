@@ -14,18 +14,21 @@ use List::Util qw/max min/;
 ### args/flags
 pod2usage("$0: No files given.") if ((@ARGV == 0) && (-t STDIN));
 
-my ($verbose, $nuc_clust_dir, $aa_clust_dir, @contig_dirs);
+my ($verbose, $nuc_clust_dir, $aa_clust_dir, @contig_dirs, $write_cluster);
 my $fork = 0;
 my $len_cutoff = 1.25;			# range expansion factor
 my $floor = 9;					# min range (bp)
 my $bit_cutoff = 0.4;			# homology cutoff
+my $truncate = 0;				# truncating contig lengths to max tblastn range
 GetOptions(
 	   "nuc=s{,}" => \$nuc_clust_dir,
 	   "aa=s{,}" => \$aa_clust_dir,
 	   "contigs=s{,}" => \@contig_dirs,
 	   "length=f" => \$len_cutoff, 			# cutoff length for a contig (%)
 	   "bitscore=f" => \$bit_cutoff, 		# normalized bitscore cutoff
-	   "floor=i" => \$floor,				# min range (bp)
+	   "minimum=i" => \$floor,				# min range (bp)
+	   "write" => \$write_cluster, 			# write cluster w/ contig
+	   "truncate=s" => \$truncate, 			# truncating 
 	   "fork=i" => \$fork,
 	   "verbose" => \$verbose,
 	   "help|?" => \&pod2usage # Help
@@ -39,7 +42,6 @@ die " ERROR: provide a directory containing gene cluster amino acid fasta file!\
 die " ERROR: provide >=1 directory containing FORAGer contig files (1 directory per query organism)!\n"
 	unless @contig_dirs;
 map{ die " ERROR: $_ not found!\n" unless -d $_; $_=File::Spec->rel2abs($_)} ($nuc_clust_dir, $aa_clust_dir, @contig_dirs);
-
 
 ### MAIN
 my $pm = new Parallel::ForkManager($fork);
@@ -56,7 +58,8 @@ foreach my $contig_dir (@contig_dirs){
 		$pm->start and next;
 		
 		if($files_r->{$clust_file} eq "NA"){		# if no contig file #
-			write_PA_table($clust_file);
+			write_PA_table($clust_file, 0, $contig_dir);
+			$pm->finish;
 			next;
 			}
 		
@@ -86,9 +89,15 @@ foreach my $contig_dir (@contig_dirs){
 		## filtering by score and length ##
 		filter_by_bitscore($contigs_r, $tblastn_r, $bit_cutoff, \%summary);
 	
-		## writing out cluster fasta & PA table ##
-		write_PA_table($clust_file, \%summary);
-		write_passed_contig_fasta(\%summary, $contigs_r, $files_r->{$clust_file}, $outdir);
+		## writing out cluster PA table ##
+		write_PA_table($clust_file, \%summary, $contig_dir);
+		
+		## truncating contigs by max tblastn hit to cluster ##
+		truncate_contigs($contigs_r, $tblastn_r, $truncate) if $truncate =~ /^\d+$/;		# must be integer
+		
+		## writing out passed contigs ##
+		my $passed_file_name = write_passed_contig_fasta(\%summary, $contigs_r, $files_r->{$clust_file}, $outdir);
+		append_cluster_to_contig($nuc_clust_dir, $clust_file, $outdir, $passed_file_name) if $write_cluster;
 	
 		$pm->finish;
 		}
@@ -97,6 +106,35 @@ $pm->wait_all_children;
 
 
 ### Subroutines
+sub truncate_contigs{
+# truncating contigs to max tblastn length #
+	my ($contigs_r, $tblastn_r, $truncate) = @_;
+	
+	foreach my $contig (keys %$contigs_r){ 		
+		# getting max hit length #
+		my $max_len = 0;
+		my @start_stop;
+		foreach my $query (keys %{$tblastn_r->{$contig}}){				
+			my $start = ${$tblastn_r->{$contig}{$query}}[0]; 
+			my $end = ${$tblastn_r->{$contig}{$query}}[1];
+			my $hit_len = abs($end - $start);		# length in nuc				
+			if($max_len < $hit_len){				# if longer hit
+				if($start < $end){					# start-end
+					@start_stop = ($start - 4 - $truncate, $end - $start + $truncate);		# start (0-indexed + 1 codon, length)
+					}
+				else{								# end-start
+					@start_stop = ($end - 4 - $truncate, $start - $end + $truncate);
+					}
+				$start_stop[0] = 0 if $start_stop[0] < 0;
+				$max_len = $hit_len;
+				}
+			}
+		
+		# truncating #
+		$contigs_r->{$contig} = substr($contigs_r->{$contig}, $start_stop[0], $start_stop[1]);
+		}
+	}
+
 sub make_outdir{
 # making output directory #
 	my ($outdir_name, $append) = @_;
@@ -109,6 +147,15 @@ sub make_outdir{
 	mkdir $outdir_name or die $!;
 	
 	return $outdir_name;
+	}
+
+sub append_cluster_to_contig{
+# appending clusters (nuc) to contig file #
+	my ($nuc_clust_dir, $clust_file, $outdir, $passed_file_name) = @_;
+	
+	my $cmd = "cat $nuc_clust_dir/$clust_file >> $outdir/$passed_file_name";
+	print "$cmd\n" unless $verbose;
+	`$cmd`;
 	}
 
 sub write_passed_contig_fasta{
@@ -127,24 +174,25 @@ sub write_passed_contig_fasta{
 		}
 	
 	close OUT;
+	return $outfile;
 	}
 	
 sub write_PA_table{
 # writing out PA table to STDOUT #
-	my ($clust_file, $summary_r) = @_;
+	my ($clust_file, $summary_r, $contig_dir) = @_;
 	
-	my @stats = qw/PA N_tblastn_hits_cutoff N_tblastn_hits length_cutoff hit_length_range norm_bit_score min_bit_score/;
+	my @stats = qw/Query_contigs PA N_tblastn_hits_cutoff N_tblastn_hits length_cutoff hit_length_range norm_bit_score min_bit_score/;
 	
 	# writing body #
 	if($summary_r){	# no contig file, failed assembly
 		foreach my $contig (keys %$summary_r){
-			print join("\t", $clust_file, $contig);
+			print join("\t", $contig_dir, $clust_file, $contig);
 			map{exists $summary_r->{$contig}{$_} ? print "\t$summary_r->{$contig}{$_}" : print "\tNA" } @stats;
 			print "\n";
 			}
 		}
 	else{
-		print join("\t", $clust_file, "NO_CONTIG_FILE", ("NA") x scalar @stats), "\n";		
+		print join("\t", $contig_dir, $clust_file, "NO_CONTIG_FILE", ("NA") x scalar @stats), "\n";		
 		}
 	}
 
@@ -186,18 +234,16 @@ sub filter_by_length{
 # filtering the contigs by length relative to cluster #
 	my ($clust_range_r, $contigs_r, $clusters_r, $tblastn_r, $summary_r) = @_;
 
-		#print Dumper @$clust_range_r;
-
 	foreach my $contig (keys %$contigs_r){ 							# checking contig
 		if($len_cutoff && exists $tblastn_r->{$contig}){			# if tblastn hit(s)
 			
 			# checking all tblastn hit lengths #
 			my $N_passed = 0;		# default = fail
 			my @hit_lens;
-			foreach my $query (keys %{$tblastn_r->{$contig}}){					# 1 hit per gene in cluster must meet length requirement
+			foreach my $query (keys %{$tblastn_r->{$contig}}){				# 1 hit per gene in cluster must meet length requirement
 				my $hit_len = abs(${$tblastn_r->{$contig}{$query}}[1] - ${$tblastn_r->{$contig}{$query}}[0]);		# length in nuc				
-				$N_passed++ if $hit_len >= $$clust_range_r[0] &&	# expanding negative range
-							   $hit_len <= $$clust_range_r[1];			# expanding positive range
+				$N_passed++ if $hit_len >= $$clust_range_r[0] &&			# expanding negative range
+							   $hit_len <= $$clust_range_r[1];				# expanding positive range
 				push(@hit_lens, $hit_len);
 				}
 				
@@ -296,20 +342,12 @@ sub norm_blast{
 	my ($tblastn_r, $tblastn_self_r, $blastn_res_r) = @_;
 	
 	foreach my $subject (keys %$tblastn_r){
-			#die " ERROR: cannot find self blastn hit for $subject!\n"
-			#	unless exists $blastn_res_r->{$subject};
 		foreach my $query (keys %{$tblastn_r->{$subject}}){
 			# sanity check #
 			die " ERROR: cannot find self blastp hit for $query!\n"
 				unless exists $tblastn_self_r->{$query};
 
-			#print join("\t", "tblastn: ${$tblastn_r->{$subject}{$query}}[3]", 
-			#			"blastn: $blastn_res_r->{$subject}", 
-			#			"blastp: $tblastn_self_r->{$query}"), "\n";
-
 			# normalizing #
-			#${$tblastn_r->{$subject}{$query}}[3] = ${$tblastn_r->{$subject}{$query}}[3] / 
-			#	max($blastn_res_r->{$subject}, $tblastn_self_r->{$query});
 			${$tblastn_r->{$subject}{$query}}[3] = ${$tblastn_r->{$subject}{$query}}[3] / 
 				$tblastn_self_r->{$query};
 			}
@@ -435,13 +473,21 @@ FORAGer_screen.pl [flags] > pres-abs_summary.txt
 
 =head2 Required flags
 
+=over
+
 =item -contig
 
 >=1 diretories of contig files produced by FORAGer_assemble.pl
 
-=item -cluster
+=item -nuc
 
->=1 diretories of cluster files produced by FORAGer.pl
+>=1 diretories of cluster files (nucleotide) produced by FORAGer.pl 
+
+=item -aa
+
+>=1 diretories of cluster files (amino acid) produced by FORAGer.pl 
+
+=back
 
 =head2 Optional flags
 
@@ -456,9 +502,17 @@ Normalized bit score cutoff (negative value to skip filtering). [0.4]
 Length range cutoff (min-max range of genes in the gene cluster * '-length'). 
 '-length 0' skips filtering. [1]
 
+=item -minimum
+
+The minimum length range for filtering (bp). [9]
+
 =item -fork
 
 Number of parallel cluster comparisons to perform. [1]
+
+=item -truncate
+
+Truncate contigs to the longest tblastn hit ('F'=FALSE; provided value added to range)? [0] 
 
 =item -v	Verbose output. [TRUE]
 
@@ -491,11 +545,44 @@ in the cluster, the min-max range is 0.75*gene_length to 1.25*gene_length.
 
 =head2 STDOUT
 
+Presence-absence summary written to STDOUT. "NA" = not applicable.
+"NO_CONTIG_FILE" = no contigs produced by the assembler. Columns:
+
+=over
+
+=item * 	Query file name
+
+=item * 	Cluster file name
+
+=item * 	Presence/Absence (binary)
+
+=item * 	Cutoff for tblastn hits
+
+=item * 	Number of tblastn hits
+
+=item * 	Length cutoff
+
+=item * 	Length range (min:max)
+
+=item * 	Normalized bit score
+
+=item * 	Minimum normalized bit score
+
+=back
+
 =head1 EXAMPLES
 
-=head2 Usage:
+=head2 Basic Usage:
 
-FORAGer_screen.pl -contig neg_contigs/ -clust neg_clusters/ > pres-abs_summary.txt
+FORAGer_screen.pl -contig Mapped2Cluster_query -nuc cluster_nuc -aa cluster_aa > pres-abs_summary.txt
+
+=head2 Append clusters to contigs:
+
+FORAGer_screen.pl -contig Mapped2Cluster_query -nuc cluster_nuc -aa cluster_aa -w > pres-abs_summary.txt
+
+=head2 Do not truncate contigs:
+
+FORAGer_screen.pl -contig Mapped2Cluster_query -nuc cluster_nuc -aa cluster_aa -w -t F > pres-abs_summary.txt
 
 =head1 AUTHOR
 
@@ -503,7 +590,7 @@ Nick Youngblut <nyoungb2@illinois.edu>
 
 =head1 AVAILABILITY
 
-sharchaea.life.uiuc.edu:/home/git/ITEP_PopGen/
+sharchaea.life.uiuc.edu:/home/git/FORAGer/
 
 =head1 COPYRIGHT
 
