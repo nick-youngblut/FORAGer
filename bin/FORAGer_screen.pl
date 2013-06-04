@@ -524,7 +524,7 @@ Normalized bit score cutoff (negative value to skip filtering). [0.4]
 =item -length
 
 Length range cutoff (min-max range of genes in the gene cluster * '-length'). 
-'-length 0' skips filtering. [1]
+'-length 0' skips filtering. [1.25]
 
 =item -minimum
 

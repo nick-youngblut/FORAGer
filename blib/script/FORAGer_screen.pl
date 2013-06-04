@@ -60,7 +60,7 @@ foreach my $contig_dir (@contig_dirs){
 	foreach my $clust_file (keys %$files_r){			# foreach cluster: basename of all 3 needed files
 		$pm->start and next;
 		
-		if($files_r->{$clust_file} eq "NA"){		# if no contig file #
+		if($files_r->{$clust_file} eq "NA"){			# if no contig file #
 			write_PA_table($clust_file, 0, $contig_dir);
 			$pm->finish;
 			next;
@@ -93,15 +93,17 @@ foreach my $contig_dir (@contig_dirs){
 		filter_by_bitscore($contigs_r, $tblastn_r, $bit_cutoff, \%summary);
 	
 		## writing out cluster PA table ##
-		write_PA_table($clust_file, \%summary, $contig_dir);
+		my $passed = write_PA_table($clust_file, \%summary, $contig_dir);
 		
 		## truncating contigs by max tblastn hit to cluster ##
 		truncate_contigs($contigs_r, $tblastn_r, $truncate) if $truncate =~ /^\d+$/;		# must be integer
 		
 		## writing out passed contigs ##
-		my $passed_file_name = write_passed_contig_fasta(\%summary, $contigs_r, $files_r->{$clust_file}, $outdir);
-		append_cluster_to_contig($nuc_clust_dir, $clust_file, $outdir, $passed_file_name) if $write_cluster;
-	
+		if($passed){			# writing out passed contig files
+			my $passed_file_name = write_passed_contig_fasta(\%summary, $contigs_r, $files_r->{$clust_file}, $outdir);
+			append_cluster_to_contig($nuc_clust_dir, $clust_file, $outdir, $passed_file_name) if $write_cluster;
+			}
+		
 		$pm->finish;
 		}
 	}
@@ -194,16 +196,20 @@ sub write_PA_table{
 	my @stats = qw/PA N_tblastn_hits_cutoff N_tblastn_hits N_cluster_genes length_cutoff hit_length_range cluster_length_range norm_bit_score min_bit_score bit_score_cutoff/;
 	
 	# writing body #
-	if($summary_r){	# no contig file, failed assembly
+	my $passed;
+	if($summary_r){	
 		foreach my $contig (keys %$summary_r){
 			print join("\t", $contig_dir, $clust_file, $contig);			# query, cluster file name, contig_name
 			map{exists $summary_r->{$contig}{$_} ? print "\t$summary_r->{$contig}{$_}" : print "\tNA" } @stats;
 			print "\n";
+			
+			$passed = 1 if $summary_r->{$contig}{"PA"};
 			}
 		}
-	else{
-		print join("\t", $contig_dir, $clust_file, "NO_CONTIG_FILE", ("NA") x scalar @stats), "\n";		
+	else{			# no contig file, failed assembly
+		print join("\t", $contig_dir, $clust_file, "NO_CONTIG_FILE", ("NA") x scalar @stats), "\n";		 
 		}
+	return $passed;
 	}
 
 sub filter_by_bitscore{
