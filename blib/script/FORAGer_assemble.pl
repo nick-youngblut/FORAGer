@@ -152,7 +152,7 @@ sub load_params{
 		$params = "-r %.fna -o %";
 		}
 	elsif($assembler eq "velvet"){
-		$params = ". 61 -fasta -short %.fna; . -cov_cutoff auto -exp_cov auto -ins_length 300 -ins_length_sd 100  -min_contig_lgth 100";
+		$params = ". 21 -fasta -short %.fna; . -cov_cutoff auto -exp_cov auto -min_contig_lgth 100";
 		}
 	else{ die " LOGIG ERROR: $!\n"; }
 	
