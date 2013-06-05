@@ -54,7 +54,6 @@ sub filter_by_annotation{
 		foreach my $annot ( @{$tbl_r->{$cluster}{"annotation"}} ){
 			foreach my $filt (@$annot_r){
 				if( $annot =~ $filt ){
-					print $annot, "\n";
 					$bad_annot_cnt++;
 					last;
 					}

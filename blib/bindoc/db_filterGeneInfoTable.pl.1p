@@ -133,18 +133,19 @@
 db_filterGeneInfoTable.pl \-\- filtering clusters in ITEP gene info table
 .SH "SYNOPSIS"
 .IX Header "SYNOPSIS"
-db_filterGeneInfoTable.pl [options] < input > output
+db_filterGeneInfoTable.pl [options] < geneinfo.txt > geneinfo_edit.txt
 .SS "options"
 .IX Subsection "options"
 .IP "\-length" 4
 .IX Item "-length"
-Minimum length cutoff of all pegs in a cluster. [0]
+Minimum length cutoff (bp) of all pegs in a cluster. [0]
 .IP "\-count" 4
 .IX Item "-count"
 Minimum number of pegs in a cluster. [0]
 .IP "\-annotation" 4
 .IX Item "-annotation"
-Filter out any
+Filter out any clusters where all pegs have provided annotations. 
+Comma delimited list. ['\s-1DEFAULT\s0' = \*(L"conserved protein, hypothetical\*(R"]
 .IP "\-v	Verbose output" 4
 .IX Item "-v	Verbose output"
 .PD 0
@@ -156,24 +157,19 @@ Filter out any
 perldoc db_filterGeneInfoTable.pl
 .SH "DESCRIPTION"
 .IX Header "DESCRIPTION"
-The flow of execution is roughly:
-   1) Step 1
-   2) Step 2
-   3) Step 3
+Convience script for filtering out clusters in a gene info table
+produced by \s-1ITEP\s0.
 .SH "EXAMPLES"
 .IX Header "EXAMPLES"
-.SS "Usage method 1"
-.IX Subsection "Usage method 1"
-db_filterGeneInfoTable.pl <read1.fastq> <read2.fastq> <output directory or basename>
-.SS "Usage method 2"
-.IX Subsection "Usage method 2"
-db_filterGeneInfoTable.pl <library file> <output directory or basename>
+.SS "Usage: filtering by length"
+.IX Subsection "Usage: filtering by length"
+db_filterGeneInfoTable.pl
 .SH "AUTHOR"
 .IX Header "AUTHOR"
 Nick Youngblut <nyoungb2@illinois.edu>
 .SH "AVAILABILITY"
 .IX Header "AVAILABILITY"
-sharchaea.life.uiuc.edu:/home/git/
+sharchaea.life.uiuc.edu:/home/git/FORAGer/
 .SH "COPYRIGHT"
 .IX Header "COPYRIGHT"
 Copyright 2010, 2011

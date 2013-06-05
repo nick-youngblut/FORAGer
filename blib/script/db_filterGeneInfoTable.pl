@@ -25,7 +25,7 @@ GetOptions(
 	   );
 
 ### I/O error & defaults
-my @annotation_filter = split /,/, $annotation_filter if $annotation_filter;
+my @annotation_filter = split / *, */, $annotation_filter if $annotation_filter;
 @annotation_filter = ("conserved protein", "hypothetical")
 	if $annotation_filter && $annotation_filter eq "DEFAULT";
 
@@ -49,17 +49,21 @@ sub write_table{
 sub filter_by_annotation{
 	my ($tbl_r, $annot_r) = @_;
 	foreach my $cluster (keys %$tbl_r){ 
-		my $skip = 0;
+		my $bad_annot_cnt = 0;
+		# checking for annotations #
 		foreach my $annot ( @{$tbl_r->{$cluster}{"annotation"}} ){
 			foreach my $filt (@$annot_r){
 				if( $annot =~ $filt ){
-					delete $tbl_r->{$cluster};
-					$skip = 1;
+					print $annot, "\n";
+					$bad_annot_cnt++;
 					last;
 					}
 				}
-			last if $skip;
 			}
+		# removing contig if all pegs have annotation #
+		 if( $bad_annot_cnt == scalar(@{$tbl_r->{$cluster}{"row"}}) ){
+		 	delete $tbl_r->{$cluster};
+		 	}
 		}	
 	}
 
@@ -110,7 +114,7 @@ db_filterGeneInfoTable.pl -- filtering clusters in ITEP gene info table
 
 =head1 SYNOPSIS
 
-db_filterGeneInfoTable.pl [options] < input > output
+db_filterGeneInfoTable.pl [options] < geneinfo.txt > geneinfo_edit.txt
 
 =head2 options
 
@@ -118,7 +122,7 @@ db_filterGeneInfoTable.pl [options] < input > output
 
 =item -length
 
-Minimum length cutoff of all pegs in a cluster. [0]
+Minimum length cutoff (bp) of all pegs in a cluster. [0]
 
 =item -count
 
@@ -126,7 +130,8 @@ Minimum number of pegs in a cluster. [0]
 
 =item -annotation
 
-Filter out any 
+Filter out any clusters where all pegs have provided annotations. 
+Comma delimited list. ['DEFAULT' = "conserved protein, hypothetical"]
 
 =item -v	Verbose output
 
@@ -140,20 +145,14 @@ perldoc db_filterGeneInfoTable.pl
 
 =head1 DESCRIPTION
 
-The flow of execution is roughly:
-   1) Step 1
-   2) Step 2
-   3) Step 3
+Convience script for filtering out clusters in a gene info table
+produced by ITEP.
 
 =head1 EXAMPLES
 
-=head2 Usage method 1
+=head2 Usage: filtering by length
 
-db_filterGeneInfoTable.pl <read1.fastq> <read2.fastq> <output directory or basename>
-
-=head2 Usage method 2
-
-db_filterGeneInfoTable.pl <library file> <output directory or basename>
+db_filterGeneInfoTable.pl 
 
 =head1 AUTHOR
 
@@ -161,7 +160,7 @@ Nick Youngblut <nyoungb2@illinois.edu>
 
 =head1 AVAILABILITY
 
-sharchaea.life.uiuc.edu:/home/git/
+sharchaea.life.uiuc.edu:/home/git/FORAGer/
 
 =head1 COPYRIGHT
 
