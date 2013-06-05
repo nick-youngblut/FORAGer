@@ -171,7 +171,7 @@ Directory of reference genomes (fasta format; extension = '.fasta|.fna|.fa').
 
 List file; tab-delimited; no header
 
-3 columns: query_organism_name, read1_file_name, read2_file_name
+3 columns: query_organism_name, query_forward_read_file, query_reverse_read_file
 
 =back
 

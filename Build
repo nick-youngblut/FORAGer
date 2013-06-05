@@ -11,7 +11,11 @@ sub magic_number_matches {
   open FH, '_build/magicnum' or return 0;
   my $filenum = <FH>;
   close FH;
+<<<<<<< HEAD
   return $filenum == 559152;
+=======
+  return $filenum == 775432;
+>>>>>>> feature/total_pipeline
 }
 
 my $progname;

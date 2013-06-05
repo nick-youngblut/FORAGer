@@ -124,7 +124,11 @@
 .\" ========================================================================
 .\"
 .IX Title "FORAGER_SCREEN 1"
+<<<<<<< HEAD
 .TH FORAGER_SCREEN 1 "2013-06-04" "perl v5.14.2" "User Contributed Perl Documentation"
+=======
+.TH FORAGER_SCREEN 1 "2013-05-21" "perl v5.14.2" "User Contributed Perl Documentation"
+>>>>>>> feature/total_pipeline
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -139,9 +143,18 @@ FORAGer_screen.pl [flags] > pres\-abs_summary.txt
 .IP "\-contig" 4
 .IX Item "-contig"
 >=1 diretories of contig files produced by FORAGer_assemble.pl
+<<<<<<< HEAD
 .IP "\-cluster" 4
 .IX Item "-cluster"
 >=1 diretories of cluster files produced by FORAGer.pl
+=======
+.IP "\-nuc" 4
+.IX Item "-nuc"
+>=1 diretories of cluster files (nucleotide) produced by FORAGer.pl
+.IP "\-aa" 4
+.IX Item "-aa"
+>=1 diretories of cluster files (amino acid) produced by FORAGer.pl
+>>>>>>> feature/total_pipeline
 .SS "Optional flags"
 .IX Subsection "Optional flags"
 .IP "\-bitscore" 4
@@ -149,6 +162,7 @@ FORAGer_screen.pl [flags] > pres\-abs_summary.txt
 Normalized bit score cutoff (negative value to skip filtering). [0.4]
 .IP "\-length" 4
 .IX Item "-length"
+<<<<<<< HEAD
 Length range cutoff (+/\- the gene cluster length stdev * '\-length). 
 \&'\-length 0' skips filtering. [1]
 .IP "\-fork" 4
@@ -157,6 +171,24 @@ Number of parallel cluster comparisons to perform. [1]
 .IP "\-v	Verbose output. [\s-1TRUE\s0]" 4
 .IX Item "-v	Verbose output. [TRUE]"
 .PD 0
+=======
+Length range cutoff (min-max range of genes in the gene cluster * '\-length'). 
+\&'\-length 0' skips filtering. [1]
+.IP "\-minimum" 4
+.IX Item "-minimum"
+The minimum length range for filtering (bp). [9]
+.IP "\-fork" 4
+.IX Item "-fork"
+Number of parallel cluster comparisons to perform. [1]
+.IP "\-truncate" 4
+.IX Item "-truncate"
+Truncate contigs to the longest tblastn hit ('F'=FALSE; provided value added to range)? [0]
+.IP "\-x 	Write header for presence-absence table? [\s-1FALSE\s0]" 4
+.IX Item "-x 	Write header for presence-absence table? [FALSE]"
+.PD 0
+.IP "\-v	Verbose output. [\s-1TRUE\s0]" 4
+.IX Item "-v	Verbose output. [TRUE]"
+>>>>>>> feature/total_pipeline
 .IP "\-h	This help message" 4
 .IX Item "-h	This help message"
 .PD
@@ -177,6 +209,7 @@ The cutoff should probably be the same as used for the original gene clustering.
 .IX Subsection "Length cutoff"
 The length range is defined as the min-max of gene lengths (bp) in the cluster.
 \&'\-length' is a scaling factor for how much to expand or contract this range.
+<<<<<<< HEAD
 By default, min-max length range values are used for the cutoff.
 .SS "\s-1STDOUT\s0"
 .IX Subsection "STDOUT"
@@ -185,16 +218,66 @@ By default, min-max length range values are used for the cutoff.
 .SS "Usage:"
 .IX Subsection "Usage:"
 FORAGer_screen.pl \-contig neg_contigs/ \-clust neg_clusters/ > pres\-abs_summary.txt
+=======
+By default, min-max length range values are used for the cutoff. If only one gene
+in the cluster, the min-max range is 0.75*gene_length to 1.25*gene_length.
+.SS "\s-1STDOUT\s0"
+.IX Subsection "STDOUT"
+Presence-absence summary written to \s-1STDOUT\s0. \*(L"\s-1NA\s0\*(R" = not applicable.
+\&\*(L"\s-1NO_CONTIG_FILE\s0\*(R" = no contigs produced by the assembler. Columns:
+.IP "\(bu" 4
+Query file name
+.IP "\(bu" 4
+Cluster file name
+.IP "\(bu" 4
+Query contig name
+.IP "\(bu" 4
+Presence/Absence (binary)
+.IP "\(bu" 4
+Number tblastn hits \s-1PASS/FAIL\s0
+.IP "\(bu" 4
+Number of tblastn hits
+.IP "\(bu" 4
+Number of genes in cluster
+.IP "\(bu" 4
+Length \s-1PASS/FAIL\s0
+.IP "\(bu" 4
+tblastn hit length range (min:max)
+.IP "\(bu" 4
+Cluster length range (min:max * '\-length')
+.IP "\(bu" 4
+Normalized bit score \s-1PASS/FAIL\s0
+.IP "\(bu" 4
+Minimum normalized bit score
+.IP "\(bu" 4
+Normalized bit score cutoff
+.SH "EXAMPLES"
+.IX Header "EXAMPLES"
+.SS "Basic Usage:"
+.IX Subsection "Basic Usage:"
+FORAGer_screen.pl \-contig Mapped2Cluster_query \-nuc cluster_nuc \-aa cluster_aa > pres\-abs_summary.txt
+.SS "Append clusters to contigs:"
+.IX Subsection "Append clusters to contigs:"
+FORAGer_screen.pl \-contig Mapped2Cluster_query \-nuc cluster_nuc \-aa cluster_aa \-w > pres\-abs_summary.txt
+.SS "Do not truncate contigs:"
+.IX Subsection "Do not truncate contigs:"
+FORAGer_screen.pl \-contig Mapped2Cluster_query \-nuc cluster_nuc \-aa cluster_aa \-w \-t F > pres\-abs_summary.txt
+>>>>>>> feature/total_pipeline
 .SH "AUTHOR"
 .IX Header "AUTHOR"
 Nick Youngblut <nyoungb2@illinois.edu>
 .SH "AVAILABILITY"
 .IX Header "AVAILABILITY"
+<<<<<<< HEAD
 sharchaea.life.uiuc.edu:/home/git/ITEP_PopGen/
+=======
+sharchaea.life.uiuc.edu:/home/git/FORAGer/
+>>>>>>> feature/total_pipeline
 .SH "COPYRIGHT"
 .IX Header "COPYRIGHT"
 Copyright 2010, 2011
 This software is licensed under the terms of the GPLv3
+<<<<<<< HEAD
 .SH "POD ERRORS"
 .IX Header "POD ERRORS"
 Hey! \fBThe above document had some coding errors, which are explained below:\fR
@@ -204,3 +287,5 @@ Hey! \fBThe above document had some coding errors, which are explained below:\fR
 .IP "Around line 437:" 4
 .IX Item "Around line 437:"
 You forgot a '=back' before '=head2'
+=======
+>>>>>>> feature/total_pipeline

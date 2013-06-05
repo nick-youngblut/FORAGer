@@ -251,7 +251,7 @@ It will be replaced with the name of each read file.
 
 =head3 Default velvet parameters
 
-". 61 -fasta -short %.fna; . -cov_cutoff auto -exp_cov auto -ins_length 300 -ins_length_sd 100  -min_contig_lgth 100"
+". 21 -fasta -short %.fna; . -cov_cutoff auto -exp_cov auto -ins_length 300 -ins_length_sd 100  -min_contig_lgth 100"
 
 =head2 WARNING
 

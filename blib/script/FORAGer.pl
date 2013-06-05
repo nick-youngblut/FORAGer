@@ -8,6 +8,10 @@ use Data::Dumper;
 use Getopt::Long;
 use File::Spec;
 use File::Path;
+<<<<<<< HEAD
+=======
+use File::Temp qw/ tempdir /;
+>>>>>>> feature/total_pipeline
 use Set::IntervalTree;
 use Storable;
 use Parallel::ForkManager;
@@ -15,17 +19,30 @@ use Parallel::ForkManager;
 ### args/flags
 pod2usage("$0: No files given.") if ((@ARGV == 0) && (-t STDIN));
 
+<<<<<<< HEAD
 my ($verbose, @sam_in, $index_in, $rev_comp_bool, $warnings_bool);
+=======
+my ($verbose, @sam_in, $index_in, $warnings_bool, $write_seqs_bool);
+>>>>>>> feature/total_pipeline
 my $gene_extend = 100;
 my $fork = 0;
 my $outdir_name = "Mapped2Cluster";
 GetOptions(
+<<<<<<< HEAD
 		"index=s" => \$index_in, 		# an index file of sam_file => FIG#
 		"extend=i" => \$gene_extend,	# bp to extend beyond gene (5' & 3')
 		"outdir=s" => \$outdir_name, 	# name of output directory
 		"fork=i" => \$fork,				# number of forked processes
 		"bitwise" => \$rev_comp_bool, 		# use SAM bit flag to rev/rev-comp reads? [FALSE]
 		"warnings" => \$warnings_bool, 	# write warnings to STDERR? [TRUE]
+=======
+		"index=s" => \$index_in, 		# an index file of sam_file => FIG_of_ref-genome
+		"extend=i" => \$gene_extend,	# bp to extend beyond gene (5' & 3')
+		"outdir=s" => \$outdir_name, 	# name of output directory
+		"fork=i" => \$fork,				# number of forked processes
+		"warnings" => \$warnings_bool, 	# write warnings to STDERR? [TRUE]
+		"sequences" => \$write_seqs_bool, 	# writing fasta for each cluter [TRUE]
+>>>>>>> feature/total_pipeline
 	   "verbose" => \$verbose,
 	   "help|?" => \&pod2usage # Help
 	   );
@@ -38,7 +55,11 @@ die " ERROR: provide an index file!\n" unless $index_in;
 my $index_r = load_index($index_in);
 
 # loading info from ITEP #
+<<<<<<< HEAD
 my $gene_start_stop_r = load_gene_info($index_r);
+=======
+my $gene_start_stop_r = load_gene_info($index_r, $write_seqs_bool);
+>>>>>>> feature/total_pipeline
 
 # foreach query #
 my $pm = new Parallel::ForkManager($fork);
@@ -47,11 +68,18 @@ foreach my $query_reads (keys %$index_r){		# each query genome
 		unless $query_reads eq "SINGLE_QUERY";
 
 	# making tmp data directory #
+<<<<<<< HEAD
 	my $tmp_dir = File::Spec->tmpdir();
 		#rmtree($tmp_dir) if -d $tmp_dir;
 		#mkdir $tmp_dir or die $!;
 	
 	# foreach SAM file # 
+=======
+	my $tmp_dir_o = File::Temp->newdir();
+	my $tmp_dir = $tmp_dir_o->dirname;
+	
+	# foreach SAM file (can fork & merge) # 
+>>>>>>> feature/total_pipeline
 	foreach my $sam_file (keys %{$index_r->{$query_reads}}){
 		my (%reads_mapped, %mapped_summary);
 	
@@ -89,9 +117,12 @@ foreach my $query_reads (keys %$index_r){		# each query genome
 	my $outdir_name_e = make_outdir($outdir_name, $query_reads);
 	write_reads_mapped($mapped_r, $outdir_name_e);
 	write_summary_table($summary_r, $outdir_name_e);
+<<<<<<< HEAD
 
 	# cleaning up #
 		#rmtree($tmp_dir) if -d $tmp_dir;
+=======
+>>>>>>> feature/total_pipeline
 	}
 
 
@@ -301,11 +332,20 @@ sub load_interval_tree{
 	
 	# status #
 	print STDERR "...loading $sam_file\n" unless $verbose;
+<<<<<<< HEAD
 	
 	# loading reads as hash #
 	open IN, $sam_file or die $!;
 	my %reads;			# contig ->  read_name -> map_ID -> category -> value
 	while(<IN>){
+=======
+	my $fh = open_file($sam_file);
+	
+	# loading reads as hash #
+		#open IN, $sam_file or die $!;
+	my %reads;			# contig ->  read_name -> map_ID -> category -> value
+	while(<$fh>){
+>>>>>>> feature/total_pipeline
 		chomp;
 		next if /^@/; 	# skipping header
 		next if /^\s*$/;	# skipping blank lines
@@ -316,6 +356,7 @@ sub load_interval_tree{
 		next if $line[3] eq "" || $line[3] == 0;		# if not mapped
 		
 		## paired end info ##
+<<<<<<< HEAD
 		if($line[6] eq "="){ 		# if pair mapping
 			my $line2 = <IN>;		# loading pair
 			my @line2 = split /\t/, $line2;
@@ -324,6 +365,12 @@ sub load_interval_tree{
 			check_bitwise(\@line) if $rev_comp_bool;
 			check_bitwise(\@line2) if $rev_comp_bool;
 			
+=======
+		if($line[6] eq "=" and ! eof($fh) ){ 		# if pair mapping
+			my $line2 = <$fh>;		# loading pair
+			my @line2 = split /\t/, $line2;
+			
+>>>>>>> feature/total_pipeline
 			## loading into hash ##
 				# start & stop by + strand
 			$reads{$line[2]}{$line[0]}{1}{$.}{"start"} = $line[3];						# contig->seq->start
@@ -335,16 +382,23 @@ sub load_interval_tree{
 			$reads{$line2[2]}{$line2[0]}{2}{$.}{"nuc"} = $line2[9];			
 			}	
 		else{ 
+<<<<<<< HEAD
 			## check bitwise flag; read back to original orientation ##
 			check_bitwise(\@line) if $rev_comp_bool;
 
+=======
+>>>>>>> feature/total_pipeline
 			## loading into hash ##
 			$reads{$line[2]}{$line[0]}{1}{$.}{"start"} = $line[3];						# contig->seq->start
 			$reads{$line[2]}{$line[0]}{1}{$.}{"stop"} = $line[3] + length $line[9];		
 			$reads{$line[2]}{$line[0]}{1}{$.}{"nuc"} = $line[9];	
 			}
 		}
+<<<<<<< HEAD
 	close IN;
+=======
+	close $fh;
+>>>>>>> feature/total_pipeline
 	
 	# loading interval tree #
 	my %itrees;
@@ -366,6 +420,7 @@ sub load_interval_tree{
 	return \%itrees, \%reads;
 	}
 	
+<<<<<<< HEAD
 sub check_bitwise{
 # checking bitwise flag in sam file line #
 ## rev or rev-comp sequence if needed ##
@@ -392,6 +447,28 @@ sub revcomp{
 
 sub load_index{
 # loading index file (sam => FIG#) #
+=======
+sub open_file{
+# check for compression; open depending on the file extension; return filehandle #
+	my $file = shift;
+	
+	my $fh;
+	if(-B $file and $file =~ /tgz$|tar.gz$/){		# if file is compressed
+		open($fh, "-|", "zcat $file | tar  -O -xf -") or die $!;
+		}
+	elsif(-B $file and $file =~ /.gz$/){			# if file is gzipped
+		open($fh, "-|", "zcat $file") or die $!;
+		}
+	else{
+		open $fh, $file or die $!;
+		}
+	
+	return $fh;
+	}
+
+sub load_index{
+# loading index file (query => sam => FIG#) #
+>>>>>>> feature/total_pipeline
 	my ($index_in) = @_;
 	
 	open IN, $index_in or die $!;
@@ -408,10 +485,17 @@ sub load_index{
 
 		# loading hash #
 		if($line[2]){	# if query name provided
+<<<<<<< HEAD
 			$index{$line[2]}{$line[0]} = $line[1];	# outdir => sam => fig
 			}
 		else{
 			$index{"SINGLE_QUERY"}{$line[0]} = $line[1];		# outdir => sam => fig
+=======
+			$index{$line[2]}{$line[0]} = $line[1];			# query => sam => subject_fig
+			}
+		else{
+			$index{"SINGLE_QUERY"}{$line[0]} = $line[1];	# query => sam => subject_fig
+>>>>>>> feature/total_pipeline
 			}
 		}
 	close IN;
@@ -422,10 +506,18 @@ sub load_index{
 
 sub load_gene_info{
 # getting geneIDs for a cluster from ITEP #
+<<<<<<< HEAD
 	my ($index_r) = @_;
 
 	# parsing ITEP output #
 	my %gene_start_stop;
+=======
+	my ($index_r, $write_seqs_bool) = @_;
+
+	# parsing ITEP output #
+	my %gene_start_stop;
+	my (%fna, %faa);		# fasta ouput of clusters (nuc & aa)
+>>>>>>> feature/total_pipeline
 	while(<>){
 		chomp;
 		next if /^\s*$/;
@@ -448,12 +540,29 @@ sub load_gene_info{
 			$gene_start_stop{$fig}{$line[13]}{$line[4]}{"stop"} = $line[5];
 			}
 		else{ die " ERROR: 'strand' must be '+' or '-'\n"; }
+<<<<<<< HEAD
+=======
+		
+		## loading sequences ##
+		$fna{$line[13]}{$line[0]} = $line[10];
+		$faa{$line[13]}{$line[0]} = $line[11];
+>>>>>>> feature/total_pipeline
 		}
 	
 	# sanity check #
 	die " ERROR: no gene information found for gene clusters!\n" if
 		scalar keys %gene_start_stop == 0;
 	
+<<<<<<< HEAD
+=======
+	# writing out fasta files #
+	unless($write_seqs_bool){
+		write_cluster_fasta(\%fna, "nuc");
+		write_cluster_fasta(\%faa, "aa");
+		print STDERR "\n" unless $verbose;
+		}
+	
+>>>>>>> feature/total_pipeline
 	# counting clusters (in provided FIGs) #
 	## getting all figs ##
 	my @figs;
@@ -462,7 +571,12 @@ sub load_gene_info{
 			push(@figs, $index_r->{$q}{$sam});
 			}
 		}
+<<<<<<< HEAD
 
+=======
+	
+	## counting clusters ##
+>>>>>>> feature/total_pipeline
 	my %cnt;
 	foreach my $fig (@figs){
 		print STDERR " WARNING: FIG $fig not found in provided gene cluster info!\n"
@@ -475,6 +589,38 @@ sub load_gene_info{
 	return \%gene_start_stop;		# fig=>cluster=>contig=>start/stop=>value
 	}
 
+<<<<<<< HEAD
+=======
+sub write_cluster_fasta{
+# writing fasta files for each cluster #
+	my ($fasta_r, $type) = @_;
+
+	# variables by types
+	my $outdir;
+	if($type eq "nuc"){ $outdir = "cluster_nuc";}
+	elsif($type eq "aa"){ $outdir = "cluster_aa"; }
+	else{ die " LOGIC ERROR: $!\n"; }
+	
+	# making directory #
+	$outdir = File::Spec->rel2abs($outdir);
+	rmtree($outdir) if -d $outdir;
+	mkdir $outdir or die $!;
+	
+	# writing cluster fasta files #
+	foreach my $clust (keys %$fasta_r){
+		open OUT, ">$outdir/clust$clust.fasta" or die $!;
+		
+		foreach my $seq (keys %{$fasta_r->{$clust}}){
+			print OUT join("\n", ">$seq", $fasta_r->{$clust}{$seq}), "\n";
+			}
+		close OUT;
+		}
+		
+	# status #
+	print STDERR "...fasta for each cluster written to $outdir\n" unless $verbose;
+	}
+
+>>>>>>> feature/total_pipeline
 sub load_cluster_ids{
 # loading cluster_id file in 'ITEP' format #
 	my ($clusterID_col) = @_;
@@ -491,7 +637,11 @@ sub load_cluster_ids{
 
 		die " ERROR: no clusters provided!\n" if scalar keys %clusterID == 0;
 		
+<<<<<<< HEAD
 		print STDERR "Number of clusters provided: ", scalar keys %clusterID, "\n"
+=======
+		print STDERR "Number of clusters provided: ", scalar keys %clusterID, "\n\n"
+>>>>>>> feature/total_pipeline
 			unless $verbose;
 
 		#print Dumper %clusterID; exit;
@@ -533,6 +683,14 @@ Output directory name (location of all mapped read files).
 For multiple queries, querie names will be appended to the directory
 name. [./Mapped2Cluster/]
 
+<<<<<<< HEAD
+=======
+=item -sequences
+
+Write out fasta nucleotide & amino acid files for all gene clusters
+provided? [TRUE]
+
+>>>>>>> feature/total_pipeline
 =item -extend
 
 Number of base pairs to extend around the gene of interest (5' & 3'). [100]
@@ -541,6 +699,7 @@ Number of base pairs to extend around the gene of interest (5' & 3'). [100]
 
 Number of SAM files to process in parallel. [1]
 
+<<<<<<< HEAD
 =item -bitwise
 
 Use SAM bitwise flag to return read to original orientation (i.e. rev/rev-comp read)
@@ -550,6 +709,19 @@ Use SAM bitwise flag to return read to original orientation (i.e. rev/rev-comp r
 =item -w 	Warnings? [TRUE]
 
 =item -h	This help message
+=======
+=item -verbose
+
+Verbose output. [TRUE]
+
+=item -warnings
+
+Display warnings. [TRUE]
+
+=item -help
+
+This help message.
+>>>>>>> feature/total_pipeline
 
 =back
 

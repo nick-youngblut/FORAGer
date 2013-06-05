@@ -8,6 +8,7 @@ use Data::Dumper;
 use Getopt::Long;
 use File::Spec;
 use File::Path;
+use File::Temp qw/ tempdir /;
 use Set::IntervalTree;
 use Storable;
 use Parallel::ForkManager;
@@ -15,17 +16,17 @@ use Parallel::ForkManager;
 ### args/flags
 pod2usage("$0: No files given.") if ((@ARGV == 0) && (-t STDIN));
 
-my ($verbose, @sam_in, $index_in, $rev_comp_bool, $warnings_bool);
+my ($verbose, @sam_in, $index_in, $warnings_bool, $write_seqs_bool);
 my $gene_extend = 100;
 my $fork = 0;
 my $outdir_name = "Mapped2Cluster";
 GetOptions(
-		"index=s" => \$index_in, 		# an index file of sam_file => FIG#
+		"index=s" => \$index_in, 		# an index file of sam_file => FIG_of_ref-genome
 		"extend=i" => \$gene_extend,	# bp to extend beyond gene (5' & 3')
 		"outdir=s" => \$outdir_name, 	# name of output directory
 		"fork=i" => \$fork,				# number of forked processes
-		"bitwise" => \$rev_comp_bool, 		# use SAM bit flag to rev/rev-comp reads? [FALSE]
 		"warnings" => \$warnings_bool, 	# write warnings to STDERR? [TRUE]
+		"sequences" => \$write_seqs_bool, 	# writing fasta for each cluter [TRUE]
 	   "verbose" => \$verbose,
 	   "help|?" => \&pod2usage # Help
 	   );
@@ -38,7 +39,7 @@ die " ERROR: provide an index file!\n" unless $index_in;
 my $index_r = load_index($index_in);
 
 # loading info from ITEP #
-my $gene_start_stop_r = load_gene_info($index_r);
+my $gene_start_stop_r = load_gene_info($index_r, $write_seqs_bool);
 
 # foreach query #
 my $pm = new Parallel::ForkManager($fork);
@@ -47,11 +48,10 @@ foreach my $query_reads (keys %$index_r){		# each query genome
 		unless $query_reads eq "SINGLE_QUERY";
 
 	# making tmp data directory #
-	my $tmp_dir = File::Spec->tmpdir();
-		#rmtree($tmp_dir) if -d $tmp_dir;
-		#mkdir $tmp_dir or die $!;
+	my $tmp_dir_o = File::Temp->newdir();
+	my $tmp_dir = $tmp_dir_o->dirname;
 	
-	# foreach SAM file # 
+	# foreach SAM file (can fork & merge) # 
 	foreach my $sam_file (keys %{$index_r->{$query_reads}}){
 		my (%reads_mapped, %mapped_summary);
 	
@@ -89,9 +89,6 @@ foreach my $query_reads (keys %$index_r){		# each query genome
 	my $outdir_name_e = make_outdir($outdir_name, $query_reads);
 	write_reads_mapped($mapped_r, $outdir_name_e);
 	write_summary_table($summary_r, $outdir_name_e);
-
-	# cleaning up #
-		#rmtree($tmp_dir) if -d $tmp_dir;
 	}
 
 
@@ -301,11 +298,12 @@ sub load_interval_tree{
 	
 	# status #
 	print STDERR "...loading $sam_file\n" unless $verbose;
+	my $fh = open_file($sam_file);
 	
 	# loading reads as hash #
-	open IN, $sam_file or die $!;
+		#open IN, $sam_file or die $!;
 	my %reads;			# contig ->  read_name -> map_ID -> category -> value
-	while(<IN>){
+	while(<$fh>){
 		chomp;
 		next if /^@/; 	# skipping header
 		next if /^\s*$/;	# skipping blank lines
@@ -316,13 +314,9 @@ sub load_interval_tree{
 		next if $line[3] eq "" || $line[3] == 0;		# if not mapped
 		
 		## paired end info ##
-		if($line[6] eq "="){ 		# if pair mapping
-			my $line2 = <IN>;		# loading pair
+		if($line[6] eq "=" and ! eof($fh) ){ 		# if pair mapping
+			my $line2 = <$fh>;		# loading pair
 			my @line2 = split /\t/, $line2;
-			
-			## check bitwise flag; read back to original orientation ##
-			check_bitwise(\@line) if $rev_comp_bool;
-			check_bitwise(\@line2) if $rev_comp_bool;
 			
 			## loading into hash ##
 				# start & stop by + strand
@@ -335,16 +329,13 @@ sub load_interval_tree{
 			$reads{$line2[2]}{$line2[0]}{2}{$.}{"nuc"} = $line2[9];			
 			}	
 		else{ 
-			## check bitwise flag; read back to original orientation ##
-			check_bitwise(\@line) if $rev_comp_bool;
-
 			## loading into hash ##
 			$reads{$line[2]}{$line[0]}{1}{$.}{"start"} = $line[3];						# contig->seq->start
 			$reads{$line[2]}{$line[0]}{1}{$.}{"stop"} = $line[3] + length $line[9];		
 			$reads{$line[2]}{$line[0]}{1}{$.}{"nuc"} = $line[9];	
 			}
 		}
-	close IN;
+	close $fh;
 	
 	# loading interval tree #
 	my %itrees;
@@ -366,32 +357,26 @@ sub load_interval_tree{
 	return \%itrees, \%reads;
 	}
 	
-sub check_bitwise{
-# checking bitwise flag in sam file line #
-## rev or rev-comp sequence if needed ##
-## returns read back to original orientation (for assembly) ##
-## input = array-ref ##
-	my ($arr_r) = @_;
+sub open_file{
+# check for compression; open depending on the file extension; return filehandle #
+	my $file = shift;
 	
-	if($$arr_r[1] & 10){	# reverse
-		$$arr_r[9] = reverse($$arr_r[9]);
+	my $fh;
+	if(-B $file and $file =~ /tgz$|tar.gz$/){		# if file is compressed
+		open($fh, "-|", "zcat $file | tar  -O -xf -") or die $!;
 		}
-	elsif($$arr_r[1] & 20){	# rev-comp
-		$$arr_r[9] = revcomp($$arr_r[9]);
+	elsif(-B $file and $file =~ /.gz$/){			# if file is gzipped
+		open($fh, "-|", "zcat $file") or die $!;
 		}
+	else{
+		open $fh, $file or die $!;
+		}
+	
+	return $fh;
 	}
 
-sub revcomp{
-        # reverse complements DNA #
-        my $seq = shift;
-        $seq = reverse($seq);
-                #$seq =~ tr/[a-z]/[A-Z]/;
-        $seq =~ tr/ACGTNBVDHKMRYSWacgtnbvdhkmrysw\.-/TGCANVBHDMKYRSWtgcanvbhdmkyrsw\.-/;
-        return $seq;
-        }
-
 sub load_index{
-# loading index file (sam => FIG#) #
+# loading index file (query => sam => FIG#) #
 	my ($index_in) = @_;
 	
 	open IN, $index_in or die $!;
@@ -408,10 +393,10 @@ sub load_index{
 
 		# loading hash #
 		if($line[2]){	# if query name provided
-			$index{$line[2]}{$line[0]} = $line[1];	# outdir => sam => fig
+			$index{$line[2]}{$line[0]} = $line[1];			# query => sam => subject_fig
 			}
 		else{
-			$index{"SINGLE_QUERY"}{$line[0]} = $line[1];		# outdir => sam => fig
+			$index{"SINGLE_QUERY"}{$line[0]} = $line[1];	# query => sam => subject_fig
 			}
 		}
 	close IN;
@@ -422,10 +407,11 @@ sub load_index{
 
 sub load_gene_info{
 # getting geneIDs for a cluster from ITEP #
-	my ($index_r) = @_;
+	my ($index_r, $write_seqs_bool) = @_;
 
 	# parsing ITEP output #
 	my %gene_start_stop;
+	my (%fna, %faa);		# fasta ouput of clusters (nuc & aa)
 	while(<>){
 		chomp;
 		next if /^\s*$/;
@@ -448,11 +434,22 @@ sub load_gene_info{
 			$gene_start_stop{$fig}{$line[13]}{$line[4]}{"stop"} = $line[5];
 			}
 		else{ die " ERROR: 'strand' must be '+' or '-'\n"; }
+		
+		## loading sequences ##
+		$fna{$line[13]}{$line[0]} = $line[10];
+		$faa{$line[13]}{$line[0]} = $line[11];
 		}
 	
 	# sanity check #
 	die " ERROR: no gene information found for gene clusters!\n" if
 		scalar keys %gene_start_stop == 0;
+	
+	# writing out fasta files #
+	unless($write_seqs_bool){
+		write_cluster_fasta(\%fna, "nuc");
+		write_cluster_fasta(\%faa, "aa");
+		print STDERR "\n" unless $verbose;
+		}
 	
 	# counting clusters (in provided FIGs) #
 	## getting all figs ##
@@ -462,7 +459,8 @@ sub load_gene_info{
 			push(@figs, $index_r->{$q}{$sam});
 			}
 		}
-
+	
+	## counting clusters ##
 	my %cnt;
 	foreach my $fig (@figs){
 		print STDERR " WARNING: FIG $fig not found in provided gene cluster info!\n"
@@ -473,6 +471,35 @@ sub load_gene_info{
 	
 		#print Dumper %gene_start_stop; exit;
 	return \%gene_start_stop;		# fig=>cluster=>contig=>start/stop=>value
+	}
+
+sub write_cluster_fasta{
+# writing fasta files for each cluster #
+	my ($fasta_r, $type) = @_;
+
+	# variables by types
+	my $outdir;
+	if($type eq "nuc"){ $outdir = "cluster_nuc";}
+	elsif($type eq "aa"){ $outdir = "cluster_aa"; }
+	else{ die " LOGIC ERROR: $!\n"; }
+	
+	# making directory #
+	$outdir = File::Spec->rel2abs($outdir);
+	rmtree($outdir) if -d $outdir;
+	mkdir $outdir or die $!;
+	
+	# writing cluster fasta files #
+	foreach my $clust (keys %$fasta_r){
+		open OUT, ">$outdir/clust$clust.fasta" or die $!;
+		
+		foreach my $seq (keys %{$fasta_r->{$clust}}){
+			print OUT join("\n", ">$seq", $fasta_r->{$clust}{$seq}), "\n";
+			}
+		close OUT;
+		}
+		
+	# status #
+	print STDERR "...fasta for each cluster written to $outdir\n" unless $verbose;
 	}
 
 sub load_cluster_ids{
@@ -491,7 +518,7 @@ sub load_cluster_ids{
 
 		die " ERROR: no clusters provided!\n" if scalar keys %clusterID == 0;
 		
-		print STDERR "Number of clusters provided: ", scalar keys %clusterID, "\n"
+		print STDERR "Number of clusters provided: ", scalar keys %clusterID, "\n\n"
 			unless $verbose;
 
 		#print Dumper %clusterID; exit;
@@ -533,6 +560,11 @@ Output directory name (location of all mapped read files).
 For multiple queries, querie names will be appended to the directory
 name. [./Mapped2Cluster/]
 
+=item -sequences
+
+Write out fasta nucleotide & amino acid files for all gene clusters
+provided? [TRUE]
+
 =item -extend
 
 Number of base pairs to extend around the gene of interest (5' & 3'). [100]
@@ -541,15 +573,17 @@ Number of base pairs to extend around the gene of interest (5' & 3'). [100]
 
 Number of SAM files to process in parallel. [1]
 
-=item -bitwise
+=item -verbose
 
-Use SAM bitwise flag to return read to original orientation (i.e. rev/rev-comp read)
+Verbose output. [TRUE]
 
-=item -v	Verbose output. [TRUE]
+=item -warnings
 
-=item -w 	Warnings? [TRUE]
+Display warnings. [TRUE]
 
-=item -h	This help message
+=item -help
+
+This help message.
 
 =back
 

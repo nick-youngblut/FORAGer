@@ -111,11 +111,19 @@ do{ my $x = [
          'quiet' => undef,
          'extra_compiler_flags' => [],
          'script_files' => [
+<<<<<<< HEAD
                              './bin/FORAGer_mapping.pl',
                              './bin/FORAGer.pl',
                              './bin/FORAGer_screen.pl',
                              './bin/FORAGer_assemble.pl',
                              './bin/db_filterGeneInfoTable.pl'
+=======
+                             './bin/FORAGer_pass_fail.pl',
+                             './bin/FORAGer_mapper.pl',
+                             './bin/FORAGer.pl',
+                             './bin/FORAGer_screen.pl',
+                             './bin/FORAGer_assemble.pl'
+>>>>>>> feature/total_pipeline
                            ],
          'build_script' => 'Build',
          'original_prefix' => {},

@@ -123,95 +123,82 @@
 .rm #[ #] #H #V #F C
 .\" ========================================================================
 .\"
-.IX Title "FORAGER_ASSEMBLE 1"
-<<<<<<< HEAD
-.TH FORAGER_ASSEMBLE 1 "2013-06-04" "perl v5.14.2" "User Contributed Perl Documentation"
-=======
-.TH FORAGER_ASSEMBLE 1 "2013-05-20" "perl v5.14.2" "User Contributed Perl Documentation"
->>>>>>> feature/total_pipeline
+.IX Title "FORAGER_MAPPER 1"
+.TH FORAGER_MAPPER 1 "2013-05-20" "perl v5.14.2" "User Contributed Perl Documentation"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
 .nh
 .SH "NAME"
-FORAGer_assemble.pl \-\- batch assembly of read files from FORAGer.pl
+FORAGer_mapping.pl \-\- Mapping reads from query genomes to all reference genomes
 .SH "SYNOPSIS"
 .IX Header "SYNOPSIS"
-FORAGer_assemble.pl [flags] > assembly_file_list.txt
+FORAGer_mapping.pl [flags] [query_directory] [subject_directory] > sam_index.txt
 .SS "Required flags"
 .IX Subsection "Required flags"
-.IP "\-directory" 4
-.IX Item "-directory"
-Directory with the mapped read files from FORAGer.pl
+.IP "\-query" 4
+.IX Item "-query"
+List file; tab-delimited; no header; columns:
+.RS 4
+.IP "\(bu" 4
+query_organism_name
+.IP "\(bu" 4
+query_forward_read_file (or all reads file)
+.IP "\(bu" 4
+query_reverse_read_file (or blank)
+.RE
+.RS 4
+.RE
+.IP "\-subject" 4
+.IX Item "-subject"
+List file; tab-delimited; no header; columns:
+.RS 4
+.IP "\(bu" 4
+subject_FIG_ID
+.IP "\(bu" 4
+subject_fasta
+.RE
+.RS 4
+.RE
 .SS "Optional flags"
 .IX Subsection "Optional flags"
-.IP "\-assembler" 4
-.IX Item "-assembler"
-The assembler used on each file of reads (velvet | idba_ud). [velvet]
-.IP "\-parameters" 4
-.IX Item "-parameters"
-The parameters provided to the assembler (see \s-1DESCRIPTION\s0 for defaults & details).
+.IP "\-params" 4
+.IX Item "-params"
+Parameters passed to bowtie2 (besides '\-x, \-S, \-1, \-2'). [\-k 10]
 .IP "\-extra" 4
 .IX Item "-extra"
-Extra parameters appended to the default parameters.
-.IP "\-v	Verbose output. [\s-1TRUE\s0]" 4
-.IX Item "-v	Verbose output. [TRUE]"
-.PD 0
-.IP "\-h	This help message" 4
-.IX Item "-h	This help message"
-.PD
+Parameters appended to '\-params'. []
+.IP "\-forks" 4
+.IX Item "-forks"
+Number of parallel calls of bowtie2. [1]
+.IP "\-verbose" 4
+.IX Item "-verbose"
+Verbose output. [\s-1TRUE\s0]
+.IP "\-help" 4
+.IX Item "-help"
+This help message.
 .SS "For more information:"
 .IX Subsection "For more information:"
-perldoc FORAGer_assemble.pl
+perldoc FORAGer_mapping.pl
 .SH "DESCRIPTION"
 .IX Header "DESCRIPTION"
-Batch assemby of the read files produced by FORAGer.pl.
-Each read file should contig all of the reads mapped to a gene cluster
-(or just mapped paired-end reads).
+Just a wrapper for bowtie2 to facilitate mapping of the query reads
+to all of the subject (reference) genomes.
 .PP
-The output is a *txt file containing the file locations for each assembly.
-The columns are: 'assembler' 'gene_clusterID' 'contig|scaffold' 'file'
+Output \s-1SAM\s0 file naming: 'query'\-'subject'.sam
 .PP
-Paired-end reads used for idba_ud; all reads used for velvet.
-.SS "Assembler parameters"
-.IX Subsection "Assembler parameters"
-\fIDescription\fR
-.IX Subsection "Description"
-.IP "'%'" 4
-.Vb 2
-\& = The base file name (file name \- extension of \*(Aq.fna\*(Aq).
-\&It will be replaced with the name of each read file.
-.Ve
-.IP "';'" 4
-.Vb 1
-\& = Separates the parameters used for velveth & velvetg.
-.Ve
-.PP
-\fIDefault idba_ud parameters\fR
-.IX Subsection "Default idba_ud parameters"
-.PP
-\&\*(L"\-r %.fna \-o %\*(R"
-.PP
-\fIDefault velvet parameters\fR
-.IX Subsection "Default velvet parameters"
-.PP
-<<<<<<< HEAD
-\&\*(L". 61 \-fasta \-short %.fna; . \-cov_cutoff auto \-exp_cov auto \-ins_length 300 \-ins_length_sd 100  \-min_contig_lgth 100\*(R"
-=======
-\&\*(L". 21 \-fasta \-short %.fna; . \-cov_cutoff auto \-exp_cov auto \-ins_length 300 \-ins_length_sd 100  \-min_contig_lgth 100\*(R"
->>>>>>> feature/total_pipeline
-.SS "\s-1WARNING\s0"
-.IX Subsection "WARNING"
-The script relies on standard file names \*(L"*_FR.fna\*(R" and \*(L"*_A.fna\*(R"
-in the input file directory!
+By default, the top 10 hits for each read are kept (bowtie2 param: '\-k 10').
+.SS "'sam_index.txt'"
+.IX Subsection "'sam_index.txt'"
+3 columns: sam_file, subject_FIG_ID, query_organism_name
 .SH "EXAMPLES"
 .IX Header "EXAMPLES"
-.SS "Basic usage (velvet assemblies)"
-.IX Subsection "Basic usage (velvet assemblies)"
-FORAGer_assemble.pl > assembly_file_list.txt
-.SS "Using idba_ud"
-.IX Subsection "Using idba_ud"
-FORAGer_assemble.pl \-a idba_ud > assembly_file_list.txt
+.SS "Basic Usage"
+.IX Subsection "Basic Usage"
+FORAGer_mapping.pl \-q ./query/ \-s ./subject/ \-list query_list.txt
+.SS "Forking & multiple bowtie2 threads"
+.IX Subsection "Forking & multiple bowtie2 threads"
+FORAGer_mapping.pl \-q ./query/ \-s ./subject/ \-list query_list.txt \-f 5 \-p \*(L"\-k 10 \-p 4\*(R"
 .SH "AUTHOR"
 .IX Header "AUTHOR"
 Nick Youngblut <nyoungb2@illinois.edu>
