@@ -124,7 +124,11 @@
 .\" ========================================================================
 .\"
 .IX Title "FORAGER 1"
+<<<<<<< HEAD
 .TH FORAGER 1 "2013-06-04" "perl v5.14.2" "User Contributed Perl Documentation"
+=======
+.TH FORAGER 1 "2013-05-21" "perl v5.14.2" "User Contributed Perl Documentation"
+>>>>>>> feature/total_pipeline
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -148,16 +152,32 @@ Index file listing *sam files & \s-1FIG\s0 IDs.
 Output directory name (location of all mapped read files). 
 For multiple queries, querie names will be appended to the directory
 name. [./Mapped2Cluster/]
+<<<<<<< HEAD
+=======
 .IP "\-sequences" 4
 .IX Item "-sequences"
 Write out fasta nucleotide & amino acid files for all gene clusters
 provided? [\s-1TRUE\s0]
+>>>>>>> feature/total_pipeline
 .IP "\-extend" 4
 .IX Item "-extend"
 Number of base pairs to extend around the gene of interest (5' & 3'). [100]
 .IP "\-fork" 4
 .IX Item "-fork"
 Number of \s-1SAM\s0 files to process in parallel. [1]
+<<<<<<< HEAD
+.IP "\-bitwise" 4
+.IX Item "-bitwise"
+Use \s-1SAM\s0 bitwise flag to return read to original orientation (i.e. rev/rev\-comp read)
+.IP "\-v	Verbose output. [\s-1TRUE\s0]" 4
+.IX Item "-v	Verbose output. [TRUE]"
+.PD 0
+.IP "\-w 	Warnings? [\s-1TRUE\s0]" 4
+.IX Item "-w 	Warnings? [TRUE]"
+.IP "\-h	This help message" 4
+.IX Item "-h	This help message"
+.PD
+=======
 .IP "\-verbose" 4
 .IX Item "-verbose"
 Verbose output. [\s-1TRUE\s0]
@@ -167,6 +187,7 @@ Display warnings. [\s-1TRUE\s0]
 .IP "\-help" 4
 .IX Item "-help"
 This help message.
+>>>>>>> feature/total_pipeline
 .SS "For more information:"
 .IX Subsection "For more information:"
 perldoc FORAGer.pl

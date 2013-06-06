@@ -123,94 +123,84 @@
 .rm #[ #] #H #V #F C
 .\" ========================================================================
 .\"
-.IX Title "FORAGER_ASSEMBLE 1"
-.TH FORAGER_ASSEMBLE 1 "2013-06-04" "perl v5.14.2" "User Contributed Perl Documentation"
+.IX Title "FORAGer 3"
+<<<<<<< HEAD
+.TH FORAGer 3 "2013-06-04" "perl v5.14.2" "User Contributed Perl Documentation"
+=======
+.TH FORAGer 3 "2013-05-20" "perl v5.14.2" "User Contributed Perl Documentation"
+>>>>>>> feature/total_pipeline
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
 .nh
 .SH "NAME"
-FORAGer_assemble.pl \-\- batch assembly of read files from FORAGer.pl
+FORAGer \- The great new FORAGer!
+.SH "VERSION"
+.IX Header "VERSION"
+Version 0.01
 .SH "SYNOPSIS"
 .IX Header "SYNOPSIS"
-FORAGer_assemble.pl [flags] > assembly_file_list.txt
-.SS "Required flags"
-.IX Subsection "Required flags"
-.IP "\-directory" 4
-.IX Item "-directory"
-Directory with the mapped read files from FORAGer.pl
-.SS "Optional flags"
-.IX Subsection "Optional flags"
-.IP "\-assembler" 4
-.IX Item "-assembler"
-The assembler used on each file of reads (velvet | idba_ud). [velvet]
-.IP "\-parameters" 4
-.IX Item "-parameters"
-The parameters provided to the assembler (see \s-1DESCRIPTION\s0 for defaults & details).
-.IP "\-extra" 4
-.IX Item "-extra"
-Extra parameters appended to the default parameters.
-.IP "\-v	Verbose output. [\s-1TRUE\s0]" 4
-.IX Item "-v	Verbose output. [TRUE]"
-.PD 0
-.IP "\-h	This help message" 4
-.IX Item "-h	This help message"
-.PD
-.SS "For more information:"
-.IX Subsection "For more information:"
-perldoc FORAGer_assemble.pl
-.SH "DESCRIPTION"
-.IX Header "DESCRIPTION"
-Batch assemby of the read files produced by FORAGer.pl.
-Each read file should contig all of the reads mapped to a gene cluster
-(or just mapped paired-end reads).
+Quick summary of what the module does.
 .PP
-The output is a *txt file containing the file locations for each assembly.
-The columns are: 'assembler' 'gene_clusterID' 'contig|scaffold' 'file'
+Perhaps a little code snippet.
 .PP
-Paired-end reads used for idba_ud; all reads used for velvet.
-.SS "Assembler parameters"
-.IX Subsection "Assembler parameters"
-\fIDescription\fR
-.IX Subsection "Description"
-.IP "'%'" 4
-.Vb 2
-\& = The base file name (file name \- extension of \*(Aq.fna\*(Aq).
-\&It will be replaced with the name of each read file.
-.Ve
-.IP "';'" 4
 .Vb 1
-\& = Separates the parameters used for velveth & velvetg.
+\&    use FORAGer;
+\&
+\&    my $foo = FORAGer\->new();
+\&    ...
 .Ve
-.PP
-\fIDefault idba_ud parameters\fR
-.IX Subsection "Default idba_ud parameters"
-.PP
-\&\*(L"\-r %.fna \-o %\*(R"
-.PP
-\fIDefault velvet parameters\fR
-.IX Subsection "Default velvet parameters"
-.PP
-\&\*(L". 21 \-fasta \-short %.fna; . \-cov_cutoff auto \-exp_cov auto \-ins_length 300 \-ins_length_sd 100  \-min_contig_lgth 100\*(R"
-.SS "\s-1WARNING\s0"
-.IX Subsection "WARNING"
-The script relies on standard file names \*(L"*_FR.fna\*(R" and \*(L"*_A.fna\*(R"
-in the input file directory!
-.SH "EXAMPLES"
-.IX Header "EXAMPLES"
-.SS "Basic usage (velvet assemblies)"
-.IX Subsection "Basic usage (velvet assemblies)"
-FORAGer_assemble.pl > assembly_file_list.txt
-.SS "Using idba_ud"
-.IX Subsection "Using idba_ud"
-FORAGer_assemble.pl \-a idba_ud > assembly_file_list.txt
+.SH "EXPORT"
+.IX Header "EXPORT"
+A list of functions that can be exported.  You can delete this section
+if you don't export anything, such as for a purely object-oriented module.
+.SH "SUBROUTINES/METHODS"
+.IX Header "SUBROUTINES/METHODS"
+.SS "function1"
+.IX Subsection "function1"
+.SS "function2"
+.IX Subsection "function2"
 .SH "AUTHOR"
 .IX Header "AUTHOR"
-Nick Youngblut <nyoungb2@illinois.edu>
-.SH "AVAILABILITY"
-.IX Header "AVAILABILITY"
-sharchaea.life.uiuc.edu:/home/git/ITEP_PopGen/
-.SH "COPYRIGHT"
-.IX Header "COPYRIGHT"
-Copyright 2010, 2011
-This software is licensed under the terms of the GPLv3
+Nick Youngblut, \f(CW\*(C`<nyoungb2 at illinois.edu>\*(C'\fR
+.SH "BUGS"
+.IX Header "BUGS"
+Please report any bugs or feature requests to \f(CW\*(C`bug\-forager at rt.cpan.org\*(C'\fR, or through
+the web interface at <http://rt.cpan.org/NoAuth/ReportBug.html?Queue=FORAGer>.  I will be notified, and then you'll
+automatically be notified of progress on your bug as I make changes.
+.SH "SUPPORT"
+.IX Header "SUPPORT"
+You can find documentation for this module with the perldoc command.
+.PP
+.Vb 1
+\&    perldoc FORAGer
+.Ve
+.PP
+You can also look for information at:
+.IP "\(bu" 4
+\&\s-1RT:\s0 \s-1CPAN\s0's request tracker (report bugs here)
+.Sp
+<http://rt.cpan.org/NoAuth/Bugs.html?Dist=FORAGer>
+.IP "\(bu" 4
+AnnoCPAN: Annotated \s-1CPAN\s0 documentation
+.Sp
+<http://annocpan.org/dist/FORAGer>
+.IP "\(bu" 4
+\&\s-1CPAN\s0 Ratings
+.Sp
+<http://cpanratings.perl.org/d/FORAGer>
+.IP "\(bu" 4
+Search \s-1CPAN\s0
+.Sp
+<http://search.cpan.org/dist/FORAGer/>
+.SH "ACKNOWLEDGEMENTS"
+.IX Header "ACKNOWLEDGEMENTS"
+.SH "LICENSE AND COPYRIGHT"
+.IX Header "LICENSE AND COPYRIGHT"
+Copyright 2013 Nick Youngblut.
+.PP
+This program is free software; you can redistribute it and/or modify it
+under the terms of either: the \s-1GNU\s0 General Public License as published
+by the Free Software Foundation; or the Artistic License.
+.PP
+See <http://dev.perl.org/licenses/> for more information.
