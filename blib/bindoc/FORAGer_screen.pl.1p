@@ -124,7 +124,7 @@
 .\" ========================================================================
 .\"
 .IX Title "FORAGER_SCREEN 1"
-.TH FORAGER_SCREEN 1 "2013-06-04" "perl v5.14.2" "User Contributed Perl Documentation"
+.TH FORAGER_SCREEN 1 "2013-06-06" "perl v5.14.2" "User Contributed Perl Documentation"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -163,6 +163,9 @@ Number of parallel cluster comparisons to perform. [1]
 .IP "\-truncate" 4
 .IX Item "-truncate"
 Truncate contigs to the longest tblastn hit ('F'=FALSE; provided value added to range)? [0]
+.IP "\-write" 4
+.IX Item "-write"
+Write clusters with passed contigs? [\s-1FALSE\s0]
 .IP "\-x 	Write header for presence-absence table? [\s-1FALSE\s0]" 4
 .IX Item "-x 	Write header for presence-absence table? [FALSE]"
 .PD 0

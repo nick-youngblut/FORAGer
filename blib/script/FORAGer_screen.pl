@@ -538,6 +538,10 @@ Number of parallel cluster comparisons to perform. [1]
 
 Truncate contigs to the longest tblastn hit ('F'=FALSE; provided value added to range)? [0] 
 
+=item -write
+
+Write clusters with passed contigs? [FALSE]
+
 =item -x 	Write header for presence-absence table? [FALSE]
 
 =item -v	Verbose output. [TRUE]

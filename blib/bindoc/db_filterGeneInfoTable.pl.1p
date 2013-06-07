@@ -124,7 +124,7 @@
 .\" ========================================================================
 .\"
 .IX Title "DB_FILTERGENEINFOTABLE 1"
-.TH DB_FILTERGENEINFOTABLE 1 "2013-06-04" "perl v5.14.2" "User Contributed Perl Documentation"
+.TH DB_FILTERGENEINFOTABLE 1 "2013-06-06" "perl v5.14.2" "User Contributed Perl Documentation"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -141,7 +141,11 @@ db_filterGeneInfoTable.pl [options] < geneinfo.txt > geneinfo_edit.txt
 Minimum length cutoff (bp) of all pegs in a cluster. [0]
 .IP "\-count" 4
 .IX Item "-count"
-Minimum number of pegs in a cluster. [0]
+Minimum number of pegs in a cluster. [1]
+.Sp
+\&\-item \-multi
+.Sp
+Minimum number of gene copies in >= 1 genome (for selecting multi-copy gene clusters). [1]
 .IP "\-annotation" 4
 .IX Item "-annotation"
 Filter out any clusters where all pegs have provided annotations. 
@@ -161,9 +165,9 @@ Convience script for filtering out clusters in a gene info table
 produced by \s-1ITEP\s0.
 .SH "EXAMPLES"
 .IX Header "EXAMPLES"
-.SS "Usage: filtering by length"
-.IX Subsection "Usage: filtering by length"
-db_filterGeneInfoTable.pl
+.SS "Usage: filtering by length (>= 300bp)"
+.IX Subsection "Usage: filtering by length (>= 300bp)"
+db_filterGeneInfoTable.pl \-l 300 < gene_info.txt > filtered_gene_info.txt
 .SH "AUTHOR"
 .IX Header "AUTHOR"
 Nick Youngblut <nyoungb2@illinois.edu>

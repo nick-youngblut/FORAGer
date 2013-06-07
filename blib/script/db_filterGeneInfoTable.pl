@@ -14,11 +14,13 @@ pod2usage("$0: No files given.") if ((@ARGV == 0) && (-t STDIN));
 
 my $verbose;
 my $len_cutoff = 0;
-my $count_cutoff = 0;
+my $count_cutoff = 1;
+my $multi_cutoff = 1;
 my $annotation_filter;
 GetOptions(
 	   "length=i" => \$len_cutoff,
 	   "count=i" => \$count_cutoff,
+	   "multi=i" => \$multi_cutoff,
 	   "annotation=s" => \$annotation_filter,
 	   "verbose" => \$verbose,
 	   "help|?" => \&pod2usage # Help
@@ -33,6 +35,7 @@ my @annotation_filter = split / *, */, $annotation_filter if $annotation_filter;
 my $tbl_r = load_gene_info_tbl();
 filter_by_length($tbl_r, $len_cutoff) if $len_cutoff;
 filter_by_count($tbl_r, $count_cutoff) if $count_cutoff;
+filter_by_multi($tbl_r, $multi_cutoff) if $multi_cutoff;
 filter_by_annotation($tbl_r, \@annotation_filter) if @annotation_filter;
 write_table($tbl_r);
 
@@ -66,6 +69,20 @@ sub filter_by_annotation{
 		}	
 	}
 
+sub filter_by_multi{
+# filtering by multiple copies in taxa #
+	my ($tbl_r, $multi_cutoff) = @_;
+	foreach my $cluster (keys %$tbl_r){
+		my $max_multi = 0;
+		foreach my $taxon ( keys %{$tbl_r->{$cluster}{"copy"}} ){
+			$max_multi = $tbl_r->{$cluster}{"copy"}{$taxon} if
+				$tbl_r->{$cluster}{"copy"}{$taxon} > $max_multi;
+			}
+		delete $tbl_r->{$cluster} if $max_multi < $multi_cutoff;
+		}
+		#print Dumper $tbl_r; exit;
+	}
+
 sub filter_by_count{
 # filtering by number in cluster #
 	my ($tbl_r, $count_cutoff) = @_;
@@ -88,16 +105,16 @@ sub load_gene_info_tbl{
 	while(<>){
 		chomp;
 		next if /^\s*$/;
-		
-		my @line = split /\t/;
-		
+	
+		my @line = split /\t/;		
 		die " ERROR: the last column should have the cluster ID!\n" 
 			unless $line[$#line] =~ /^\d+$/;
+		
+		# loading table #
 		push(@{$ginfo{$line[$#line]}{"row"}}, \@line);
 		push(@{$ginfo{$line[$#line]}{"length"}}, abs($line[6] - $line[5]));
 		push(@{$ginfo{$line[$#line]}{"annotation"}}, $line[9]);
-
-			#print Dumper @{$ginfo{$line[$#line]}{"annotation"}}; exit;
+		$ginfo{$line[$#line]}{"copy"}{$line[1]}++;							# copy number
 		}
 		#print Dumper %ginfo; exit;
 	return \%ginfo;
@@ -125,7 +142,11 @@ Minimum length cutoff (bp) of all pegs in a cluster. [0]
 
 =item -count
 
-Minimum number of pegs in a cluster. [0]
+Minimum number of pegs in a cluster. [1]
+
+-item -multi
+
+Minimum number of gene copies in >= 1 genome (for selecting multi-copy gene clusters). [1]
 
 =item -annotation
 
@@ -149,9 +170,9 @@ produced by ITEP.
 
 =head1 EXAMPLES
 
-=head2 Usage: filtering by length
+=head2 Usage: filtering by length (>= 300bp)
 
-db_filterGeneInfoTable.pl 
+db_filterGeneInfoTable.pl -l 300 < gene_info.txt > filtered_gene_info.txt
 
 =head1 AUTHOR
 
