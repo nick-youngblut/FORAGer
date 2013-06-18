@@ -16,10 +16,13 @@ pod2usage("$0: No files given.") if ((@ARGV == 0) && (-t STDIN));
 
 my ($verbose, $nuc_clust_dir, $aa_clust_dir, @contig_dirs, $write_cluster, $header_bool);
 my $fork = 0;
-my $len_cutoff = 1.25;			# range expansion factor
-my $floor = 9;					# min range (bp)
+my $len_cutoff = 3;				# range expansion factor [3x]
+my $floor = 300;				# min range (bp)
 my $bit_cutoff = 0.4;			# homology cutoff
 my $truncate = 0;				# truncating contig lengths to max tblastn range
+my $out_prefix = "FORAGer";
+my $runID = "NA";
+my $query_name = "NA";
 GetOptions(
 	   "nuc=s{,}" => \$nuc_clust_dir,
 	   "aa=s{,}" => \$aa_clust_dir,
@@ -28,8 +31,11 @@ GetOptions(
 	   "bitscore=f" => \$bit_cutoff, 		# normalized bitscore cutoff
 	   "minimum=i" => \$floor,				# min range (bp)
 	   "write" => \$write_cluster, 			# write cluster w/ contig
-	   "truncate=s" => \$truncate, 			# truncating 
+	   "truncate=s" => \$truncate, 			# truncating 'passed' contigs to max cluster sequence length [TRUE]
 	   "x" => \$header_bool, 				# write header? [FALSE]
+	   "runID=s" => \$runID,				# ITEP runID
+	   "query=s" => \$query_name, 			# query genome name
+	   "prefix=s" => \$out_prefix, 			# outfile prefix
 	   "fork=i" => \$fork,
 	   "verbose" => \$verbose,
 	   "help|?" => \&pod2usage # Help
@@ -42,6 +48,10 @@ die " ERROR: provide a directory containing gene cluster amino acid fasta file!\
 	unless $aa_clust_dir;
 die " ERROR: provide >=1 directory containing FORAGer contig files (1 directory per query organism)!\n"
 	unless @contig_dirs;
+print STDERR " WARNING: the ITEP run_ID used for obtaining the clusters was not provided! P/A table field with be NA's!\n"
+	unless $runID;
+print STDERR " WARNING: the query genome FIG_ID was not provided! P/A table field with be NA's!\n"
+	unless $query_name;
 map{ die " ERROR: $_ not found!\n" unless -d $_; $_=File::Spec->rel2abs($_)} ($nuc_clust_dir, $aa_clust_dir, @contig_dirs);
 
 ### MAIN
@@ -56,12 +66,17 @@ foreach my $contig_dir (@contig_dirs){
 	# outdir for fasta files of passed contigs #
 	my $outdir = make_outdir($contig_dir, "_passed");
 
+	# opening output file handles #
+	open my $filter_fh, ">$out_prefix\_screen.txt" or die $!;
+	open my $PA_fh, ">$out_prefix\_PA.txt" or die $!;
+
 	# blasting, filtering, writing results #
 	foreach my $clust_file (keys %$files_r){			# foreach cluster: basename of all 3 needed files
 		$pm->start and next;
 		
-		if($files_r->{$clust_file} eq "NA"){			# if no contig file #
-			write_PA_table($clust_file, 0, $contig_dir);
+		# if no contig file; filter table gets 'NA' #
+		if($files_r->{$clust_file} eq "NA"){		
+			write_filter_table($clust_file, 0, $contig_dir, $filter_fh);
 			$pm->finish;
 			next;
 			}
@@ -92,8 +107,8 @@ foreach my $contig_dir (@contig_dirs){
 		## filtering by score and length ##
 		filter_by_bitscore($contigs_r, $tblastn_r, $bit_cutoff, \%summary);
 	
-		## writing out cluster PA table ##
-		my $passed = write_PA_table($clust_file, \%summary, $contig_dir);
+		## writing out contig filter table ##
+		my $passed = write_filter_table($clust_file, \%summary, $contig_dir, $filter_fh);
 		
 		## truncating contigs by max tblastn hit to cluster ##
 		truncate_contigs($contigs_r, $tblastn_r, $truncate) if $truncate =~ /^\d+$/;		# must be integer
@@ -103,14 +118,43 @@ foreach my $contig_dir (@contig_dirs){
 			my $passed_file_name = write_passed_contig_fasta(\%summary, $contigs_r, $files_r->{$clust_file}, $outdir);
 			append_cluster_to_contig($nuc_clust_dir, $clust_file, $outdir, $passed_file_name) if $write_cluster;
 			}
+
+		## writing PA table (for ITEP) ##
+		write_PA_table(\%summary, $clust_file, $contigs_r, $runID, $query_name, $PA_fh) if $passed;
 		
 		$pm->finish;
 		}
+	
+	# closing file handles #
+	close $filter_fh;
+	close $PA_fh;
 	}
 $pm->wait_all_children;
 
 
 ### Subroutines
+sub write_PA_table{
+	my ($summary_r, $clust_file, $contigs_r, $runID, $query_name, $PA_fh) = @_;
+	
+	# cluster ID #
+	(my $cluster_id = $clust_file) =~ s/.*clust(\d+).+/$1/;
+	
+	# writing entries for PA table #
+	foreach my $passed_contig (keys %$summary_r){
+		if($summary_r->{$passed_contig}{"PA"}){		# passed; need to write out
+			die " ERROR: $passed_contig not found in contig file!\n" 
+				unless exists $contigs_r->{$passed_contig};
+			
+			my $user_geneid = join("__", "FORAGer", $passed_contig, time());
+			print $PA_fh join("\t", $user_geneid, $query_name, "CDS",
+					"", "", "",
+					$runID, $cluster_id, $contigs_r->{$passed_contig},
+					"", ""), "\n";		
+			}
+		}	
+	close OUT;
+	}
+
 sub write_header{
 # writing the header to the PA table #
 	my @header = qw|Query_file_name Cluster_file_name Query_contig_name Presence/Absence_(binary) Number_tblastn_hits_PASS/FAIL Number_of_tblastn_hits Number_of_genes_in_cluster Length_PASS/FAIL tblastn_hit_length_range Cluster_length_range Normalized_bit_score_PASS/FAIL Minimum_normalized_bit_score Normalized_bit_score_cutoff|;
@@ -189,9 +233,9 @@ sub write_passed_contig_fasta{
 	return $outfile;
 	}
 	
-sub write_PA_table{
+sub write_filter_table{
 # writing out PA table to STDOUT #
-	my ($clust_file, $summary_r, $contig_dir) = @_;
+	my ($clust_file, $summary_r, $contig_dir, $filter_fh) = @_;
 	
 	my @stats = qw/PA N_tblastn_hits_cutoff N_tblastn_hits N_cluster_genes length_cutoff hit_length_range cluster_length_range norm_bit_score min_bit_score bit_score_cutoff/;
 	
@@ -199,16 +243,17 @@ sub write_PA_table{
 	my $passed;
 	if($summary_r){	
 		foreach my $contig (keys %$summary_r){
-			print join("\t", $contig_dir, $clust_file, $contig);			# query, cluster file name, contig_name
-			map{exists $summary_r->{$contig}{$_} ? print "\t$summary_r->{$contig}{$_}" : print "\tNA" } @stats;
-			print "\n";
+			print $filter_fh join("\t", $contig_dir, $clust_file, $contig);			# query, cluster file name, contig_name
+			map{exists $summary_r->{$contig}{$_} ? print $filter_fh "\t$summary_r->{$contig}{$_}" : print $filter_fh "\tNA" } @stats;
+			print $filter_fh "\n";
 			
 			$passed = 1 if $summary_r->{$contig}{"PA"};
 			}
 		}
 	else{			# no contig file, failed assembly
-		print join("\t", $contig_dir, $clust_file, "NO_CONTIG_FILE", ("NA") x scalar @stats), "\n";		 
+		print $filter_fh join("\t", $contig_dir, $clust_file, "NO_CONTIG_FILE", ("NA") x scalar @stats), "\n";		 
 		}
+		
 	return $passed;
 	}
 
@@ -336,7 +381,7 @@ sub get_clust_len_range{
 			#print Dumper $min - $exp, $max + $exp if ($max + $exp) - ($min - $exp) < 9;
 		return [$min - $exp, $max + $exp];						# range +/- expansion
 		}		# if >1 peg in cluster, max - min
-	else{ return [($lens[0] -3) * 0.75, $lens[0] * 1.25]; }	# just length of the gene +/- 0.25%
+	else{ return [($lens[0] -3) * 0.5, $lens[0] * 1.5]; }	# just length of the gene +/- 50%
 	}
 
 sub load_fasta{
@@ -511,11 +556,23 @@ FORAGer_screen.pl [flags] > pres-abs_summary.txt
 
 >=1 diretories of cluster files (amino acid) produced by FORAGer.pl 
 
+=item -runID
+
+The ITEP runID used to make the clusters. (NA's written to P/A table if not provided)
+
+=item -query 
+
+The FIG_ID of the query genome. (NA's written to P/A table if not provided)
+
 =back
 
 =head2 Optional flags
 
 =over
+
+=item -prefix
+
+Output file prefix. [FORAGer]
 
 =item -bitscore
 
@@ -524,11 +581,11 @@ Normalized bit score cutoff (negative value to skip filtering). [0.4]
 =item -length
 
 Length range cutoff (min-max range of genes in the gene cluster * '-length'). 
-'-length 0' skips filtering. [1.25]
+'-length 0' skips filtering. [3]
 
 =item -minimum
 
-The minimum length range for filtering (bp). [9]
+The minimum length range for filtering (bp). [300]
 
 =item -fork
 
@@ -571,11 +628,12 @@ The cutoff should probably be the same as used for the original gene clustering.
 The length range is defined as the min-max of gene lengths (bp) in the cluster.
 '-length' is a scaling factor for how much to expand or contract this range.
 By default, min-max length range values are used for the cutoff. If only one gene
-in the cluster, the min-max range is 0.75*gene_length to 1.25*gene_length.
+in the cluster, the min-max range is 0.5*gene_length to 1.5*gene_length.
 
-=head2 STDOUT
+=head2 Output: *screen.txt file
 
-Presence-absence summary written to STDOUT. "NA" = not applicable.
+Screening summary describing which filters were passed/failed. 
+"NA" = not applicable.
 "NO_CONTIG_FILE" = no contigs produced by the assembler. Columns:
 
 =over
@@ -608,19 +666,49 @@ Presence-absence summary written to STDOUT. "NA" = not applicable.
 
 =back
 
+=head2 Output: *PA.txt file
+
+Presence/Absence file for updating ITEP.
+
+=over
+
+=item * 	user_geneid
+
+=item * 	organismid
+
+=item * 	genetype
+
+=item * 	contigid
+
+=item * 	startloc
+
+=item * 	stoploc
+
+=item * 	runid
+
+=item * 	clusterid
+
+=item * 	seq
+
+=item * 	type
+
+=item * 	annotation
+
+=back
+
 =head1 EXAMPLES
 
 =head2 Basic Usage:
 
-FORAGer_screen.pl -contig Mapped2Cluster_query -nuc cluster_nuc -aa cluster_aa > pres-abs_summary.txt
+FORAGer_screen.pl -contig Mapped2Cluster_query -nuc cluster_nuc -aa cluster_aa -query 2209.25 -run mazei_I_2.0_c_0.4_m_maxbit
 
 =head2 Append clusters to contigs:
 
-FORAGer_screen.pl -contig Mapped2Cluster_query -nuc cluster_nuc -aa cluster_aa -w > pres-abs_summary.txt
+FORAGer_screen.pl -contig Mapped2Cluster_query -nuc cluster_nuc -aa cluster_aa -w -query 2209.25 -run mazei_I_2.0_c_0.4_m_maxbit
 
 =head2 Do not truncate contigs:
 
-FORAGer_screen.pl -contig Mapped2Cluster_query -nuc cluster_nuc -aa cluster_aa -w -t F > pres-abs_summary.txt
+FORAGer_screen.pl -contig Mapped2Cluster_query -nuc cluster_nuc -aa cluster_aa -w -t F -query 2209.25 -run mazei_I_2.0_c_0.4_m_maxbit
 
 =head1 AUTHOR
 
