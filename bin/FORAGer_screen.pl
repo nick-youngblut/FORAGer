@@ -16,8 +16,8 @@ pod2usage("$0: No files given.") if ((@ARGV == 0) && (-t STDIN));
 
 my ($verbose, $nuc_clust_dir, $aa_clust_dir, @contig_dirs, $write_cluster, $header_bool);
 my $fork = 0;
-my $len_cutoff = 1.25;			# range expansion factor
-my $floor = 9;					# min range (bp)
+my $len_cutoff = 3;				# range expansion factor [3x]
+my $floor = 200;				# min range (bp)
 my $bit_cutoff = 0.4;			# homology cutoff
 my $truncate = 0;				# truncating contig lengths to max tblastn range
 GetOptions(
@@ -28,7 +28,7 @@ GetOptions(
 	   "bitscore=f" => \$bit_cutoff, 		# normalized bitscore cutoff
 	   "minimum=i" => \$floor,				# min range (bp)
 	   "write" => \$write_cluster, 			# write cluster w/ contig
-	   "truncate=s" => \$truncate, 			# truncating 
+	   "truncate=s" => \$truncate, 			# truncating 'passed' contigs to max cluster sequence length [TRUE]
 	   "x" => \$header_bool, 				# write header? [FALSE]
 	   "fork=i" => \$fork,
 	   "verbose" => \$verbose,
