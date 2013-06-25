@@ -124,7 +124,7 @@
 .\" ========================================================================
 .\"
 .IX Title "FORAGER_SCREEN 1"
-.TH FORAGER_SCREEN 1 "2013-06-18" "perl v5.14.2" "User Contributed Perl Documentation"
+.TH FORAGER_SCREEN 1 "2013-06-25" "perl v5.14.2" "User Contributed Perl Documentation"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -145,6 +145,8 @@ FORAGer_screen.pl [flags] > pres\-abs_summary.txt
 .IP "\-aa" 4
 .IX Item "-aa"
 >=1 diretories of cluster files (amino acid) produced by FORAGer.pl
+.SS "Semi-optional flags"
+.IX Subsection "Semi-optional flags"
 .IP "\-runID" 4
 .IX Item "-runID"
 The \s-1ITEP\s0 runID used to make the clusters. (\s-1NA\s0's written to P/A table if not provided)
