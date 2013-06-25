@@ -112,6 +112,7 @@ do{ my $x = [
          'extra_compiler_flags' => [],
          'script_files' => [
                              './bin/FORAGer_pass_fail.pl',
+                             './bin/FORAGer_tblastn_filter.pl',
                              './bin/FORAGer_mapper.pl',
                              './bin/FORAGer.pl',
                              './bin/FORAGer_screen.pl',

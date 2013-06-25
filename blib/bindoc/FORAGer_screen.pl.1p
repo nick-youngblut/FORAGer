@@ -124,7 +124,7 @@
 .\" ========================================================================
 .\"
 .IX Title "FORAGER_SCREEN 1"
-.TH FORAGER_SCREEN 1 "2013-06-06" "perl v5.14.2" "User Contributed Perl Documentation"
+.TH FORAGER_SCREEN 1 "2013-06-18" "perl v5.14.2" "User Contributed Perl Documentation"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -145,18 +145,27 @@ FORAGer_screen.pl [flags] > pres\-abs_summary.txt
 .IP "\-aa" 4
 .IX Item "-aa"
 >=1 diretories of cluster files (amino acid) produced by FORAGer.pl
+.IP "\-runID" 4
+.IX Item "-runID"
+The \s-1ITEP\s0 runID used to make the clusters. (\s-1NA\s0's written to P/A table if not provided)
+.IP "\-query" 4
+.IX Item "-query"
+The \s-1FIG_ID\s0 of the query genome. (\s-1NA\s0's written to P/A table if not provided)
 .SS "Optional flags"
 .IX Subsection "Optional flags"
+.IP "\-prefix" 4
+.IX Item "-prefix"
+Output file prefix. [FORAGer]
 .IP "\-bitscore" 4
 .IX Item "-bitscore"
 Normalized bit score cutoff (negative value to skip filtering). [0.4]
 .IP "\-length" 4
 .IX Item "-length"
 Length range cutoff (min-max range of genes in the gene cluster * '\-length'). 
-\&'\-length 0' skips filtering. [1.25]
+\&'\-length 0' skips filtering. [3]
 .IP "\-minimum" 4
 .IX Item "-minimum"
-The minimum length range for filtering (bp). [9]
+The minimum length range for filtering (bp). [300]
 .IP "\-fork" 4
 .IX Item "-fork"
 Number of parallel cluster comparisons to perform. [1]
@@ -192,10 +201,11 @@ The cutoff should probably be the same as used for the original gene clustering.
 The length range is defined as the min-max of gene lengths (bp) in the cluster.
 \&'\-length' is a scaling factor for how much to expand or contract this range.
 By default, min-max length range values are used for the cutoff. If only one gene
-in the cluster, the min-max range is 0.75*gene_length to 1.25*gene_length.
-.SS "\s-1STDOUT\s0"
-.IX Subsection "STDOUT"
-Presence-absence summary written to \s-1STDOUT\s0. \*(L"\s-1NA\s0\*(R" = not applicable.
+in the cluster, the min-max range is 0.5*gene_length to 1.5*gene_length.
+.SS "Output: *screen.txt file"
+.IX Subsection "Output: *screen.txt file"
+Screening summary describing which filters were passed/failed. 
+\&\*(L"\s-1NA\s0\*(R" = not applicable.
 \&\*(L"\s-1NO_CONTIG_FILE\s0\*(R" = no contigs produced by the assembler. Columns:
 .IP "\(bu" 4
 Query file name
@@ -223,17 +233,42 @@ Normalized bit score \s-1PASS/FAIL\s0
 Minimum normalized bit score
 .IP "\(bu" 4
 Normalized bit score cutoff
+.SS "Output: *PA.txt file"
+.IX Subsection "Output: *PA.txt file"
+Presence/Absence file for updating \s-1ITEP\s0.
+.IP "\(bu" 4
+user_geneid
+.IP "\(bu" 4
+organismid
+.IP "\(bu" 4
+genetype
+.IP "\(bu" 4
+contigid
+.IP "\(bu" 4
+startloc
+.IP "\(bu" 4
+stoploc
+.IP "\(bu" 4
+runid
+.IP "\(bu" 4
+clusterid
+.IP "\(bu" 4
+seq
+.IP "\(bu" 4
+type
+.IP "\(bu" 4
+annotation
 .SH "EXAMPLES"
 .IX Header "EXAMPLES"
 .SS "Basic Usage:"
 .IX Subsection "Basic Usage:"
-FORAGer_screen.pl \-contig Mapped2Cluster_query \-nuc cluster_nuc \-aa cluster_aa > pres\-abs_summary.txt
+FORAGer_screen.pl \-contig Mapped2Cluster_query \-nuc cluster_nuc \-aa cluster_aa \-query 2209.25 \-run mazei_I_2.0_c_0.4_m_maxbit
 .SS "Append clusters to contigs:"
 .IX Subsection "Append clusters to contigs:"
-FORAGer_screen.pl \-contig Mapped2Cluster_query \-nuc cluster_nuc \-aa cluster_aa \-w > pres\-abs_summary.txt
+FORAGer_screen.pl \-contig Mapped2Cluster_query \-nuc cluster_nuc \-aa cluster_aa \-w \-query 2209.25 \-run mazei_I_2.0_c_0.4_m_maxbit
 .SS "Do not truncate contigs:"
 .IX Subsection "Do not truncate contigs:"
-FORAGer_screen.pl \-contig Mapped2Cluster_query \-nuc cluster_nuc \-aa cluster_aa \-w \-t F > pres\-abs_summary.txt
+FORAGer_screen.pl \-contig Mapped2Cluster_query \-nuc cluster_nuc \-aa cluster_aa \-w \-t F \-query 2209.25 \-run mazei_I_2.0_c_0.4_m_maxbit
 .SH "AUTHOR"
 .IX Header "AUTHOR"
 Nick Youngblut <nyoungb2@illinois.edu>
