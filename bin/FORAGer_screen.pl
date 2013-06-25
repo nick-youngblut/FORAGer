@@ -49,9 +49,9 @@ die " ERROR: provide a directory containing gene cluster amino acid fasta file!\
 die " ERROR: provide >=1 directory containing FORAGer contig files (1 directory per query organism)!\n"
 	unless @contig_dirs;
 print STDERR " WARNING: the ITEP run_ID used for obtaining the clusters was not provided! P/A table field with be NA's!\n"
-	unless $runID;
+	unless $runID ne "NA";
 print STDERR " WARNING: the query genome FIG_ID was not provided! P/A table field with be NA's!\n"
-	unless $query_name;
+	unless $query_name ne "NA";
 map{ die " ERROR: $_ not found!\n" unless -d $_; $_=File::Spec->rel2abs($_)} ($nuc_clust_dir, $aa_clust_dir, @contig_dirs);
 
 ### MAIN
@@ -67,8 +67,10 @@ foreach my $contig_dir (@contig_dirs){
 	my $outdir = make_outdir($contig_dir, "_passed");
 
 	# opening output file handles #
-	open my $filter_fh, ">$out_prefix\_screen.txt" or die $!;
-	open my $PA_fh, ">$out_prefix\_PA.txt" or die $!;
+	my $filter_out_name = "$out_prefix\_screen.txt";
+	open my $filter_fh, ">$filter_out_name" or die $!;
+	my $PA_out_name = "$out_prefix\_PA.txt";
+	open my $PA_fh, ">$PA_out_name" or die $!;
 
 	# blasting, filtering, writing results #
 	foreach my $clust_file (keys %$files_r){			# foreach cluster: basename of all 3 needed files
@@ -127,7 +129,9 @@ foreach my $contig_dir (@contig_dirs){
 	
 	# closing file handles #
 	close $filter_fh;
+	print STDERR " Filter summary file written: $filter_out_name\n";
 	close $PA_fh;
+	print STDERR " Presence-absence file written: $PA_out_name\n";
 	}
 $pm->wait_all_children;
 
@@ -555,6 +559,12 @@ FORAGer_screen.pl [flags] > pres-abs_summary.txt
 =item -aa
 
 >=1 diretories of cluster files (amino acid) produced by FORAGer.pl 
+
+=back
+
+=head2 Semi-optional flags
+
+=over
 
 =item -runID
 
