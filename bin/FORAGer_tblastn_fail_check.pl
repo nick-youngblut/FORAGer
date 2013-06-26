@@ -17,7 +17,7 @@ my $overlap = 0.80;
 my $evalue = "1e-30";
 my $length = 0.8;
 my $outdir = "fail_check_tblastn";
-my $hit_frac = 0.5;
+my $hit_frac = 1;
 GetOptions(
 		"runID=s" => \$runID,
 		"fig=s" => \$fig,					# FIG query
