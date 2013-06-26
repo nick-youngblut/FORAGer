@@ -15,17 +15,19 @@ pod2usage("$0: No files given.") if ((@ARGV == 0) && (-t STDIN));
 my ($verbose, $runID, $fig, $PA_in, $screen_in);
 my $overlap = 0.05;
 my $evalue = "1e-30";
-my $length = 0.80;
+my $length = 0.8;
 my $outdir = "passed_tblastn";
+my $hit_frac = 0.5;
 GetOptions(
 		"runID=s" => \$runID,
 		"fig=s" => \$fig,
 		"overlap=f" => \$overlap,
-		"evalue=s" => \$evalue,
-		"length=i" => \$length,
-		"name=s" => \$outdir,
-		"PA=s" => \$PA_in,
+		"evalue=s" => \$evalue,				# evalue cutoff for 'good' hit
+		"length=f" => \$length,				# length cutoff for 'good' hit
+		"name=s" => \$outdir,				# output ditrection name
+		"PA=s" => \$PA_in,					# PA file
 		"screen=s" => \$screen_in,
+		"x=f" => \$hit_frac,			# fraction of PEGs in cluster that must have an good overlapping hit
 	   "verbose" => \$verbose,
 	   "help|?" => \&pod2usage # Help
 	   );
@@ -132,9 +134,14 @@ sub make_tblastn_dir{
 sub call_tblastn_wrapper{
 	my ($infile, $outdir, $cluster, $runID, $fig, $res_r) = @_;
 	
+	# getting number of pegs in cluster #
+	my $cmd = "printf \"$runID\\t$cluster\\n\" | db_getGenesInClusters.py | wc -l |";
+	open PIPE, $cmd or die $!;
+	chomp(my $n_pegs = <PIPE>);
+	close PIPE;
+	
 	# opening pipe for db_TBlastN_wrapper.py #
-	my $cmd = "printf \"$runID\\t$cluster\\n\" | db_getClusterGeneInformation.py | db_TBlastN_wrapper.py -o $fig |";
-		#print STDERR "$cmd\n" unless $verbose;
+	$cmd = "printf \"$runID\\t$cluster\\n\" | db_getClusterGeneInformation.py | db_TBlastN_wrapper.py -o $fig |";
 	open PIPE, $cmd or die $!;
 	
 	# making tblast output file #
@@ -142,9 +149,9 @@ sub call_tblastn_wrapper{
 	open OUT, ">$outdir/$tblastn_out" or die $!;
 	
 	# reading from PIPE #
+	my %overlapping;
 	while(<PIPE>){
 		print OUT;
-		last if exists $res_r->{$cluster} && $res_r->{$cluster} eq "overlapping_gene";  	# skip if already determined to exist
 		
 		chomp;
 		my @line = split /\t/;
@@ -155,17 +162,23 @@ sub call_tblastn_wrapper{
 
 			# overlapping with alread called gene? #
 			if($line[11] eq "SAMESTRAND" && 			# gene already called on same strand
-				$line[15] >= $overlap){					# gene overlaps w/ tblastn hit
-				$res_r->{$cluster} = "overlapping_gene";		
+				$line[15] >= $overlap){					# gene overlaps w/ tblastn hit	
+				$overlapping{$line[0]} = 1;				# peg has good overlapping hit
 				}	
-			else{
-				$res_r->{$cluster} = "new_gene";		
-				}
 			}
-		else{ $res_r->{$cluster} = "new_gene" };
 		}
 	close PIPE;
 	close OUT;
+	
+	# determine if number of overlapping hits meets cutoff #
+	my $overlap_frac = (scalar keys %overlapping) / $n_pegs;
+	print STDERR "\nCluster: $cluster; Fraction_PEGs_with_good_overlapping_tblastn_hits: $overlap_frac\n\n"
+		unless $verbose;
+	if( $overlap_frac >= $hit_frac){		# if cutoff met
+		$res_r->{$cluster} = "overlapping_gene";
+		}
+	else{ $res_r->{$cluster} = "new_gene"; }
+		
 		#print Dumper %$res_r; exit;
 	}
 
@@ -236,6 +249,10 @@ tblastn evalue cutoff. [1e-30]
 
 minimum tblast hit length (fraction of query length). [0.80]
 
+=item -x
+
+Fraction of query PEGs that must have good overlapping hits (>=). [0.5]
+
 =item -name
 
 Name of tblastn output file directoy. ['passed_tblastn']
@@ -268,9 +285,10 @@ used for the tblastn query.
 
 =back
 
-Any of the queries have good hits to a genome region
-overlapping a pre-existing gene, the query contig
-from FORAGer is considered pre-existing. 
+If '-x' fraction of query PEGs have good overlapping
+hits to pre-existing genes, the query contig
+from FORAGer is considered pre-existing or an 
+artefact (i.e. not a real new gene). 
 
 If the presence-absence & screening summary
 files from FORAGer_screen.pl are provided, both
@@ -293,7 +311,7 @@ the tblastn results.
 
 =head2 Requires:
 
-db_TBlastN_wrapper.py
+ITEP & db_TBlastN_wrapper.py
 
 =head1 EXAMPLES
 
