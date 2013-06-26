@@ -153,7 +153,7 @@ sub write_PA_table{
 			print $PA_fh join("\t", $user_geneid, $query_name, "CDS",
 					"", "", "",
 					$runID, $cluster_id, $contigs_r->{$passed_contig},
-					"", ""), "\n";		
+					""), "\n";		
 			}
 		}	
 	close OUT;
