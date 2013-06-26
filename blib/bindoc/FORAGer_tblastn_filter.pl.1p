@@ -124,7 +124,7 @@
 .\" ========================================================================
 .\"
 .IX Title "FORAGER_TBLASTN_FILTER 1"
-.TH FORAGER_TBLASTN_FILTER 1 "2013-06-25" "perl v5.14.2" "User Contributed Perl Documentation"
+.TH FORAGER_TBLASTN_FILTER 1 "2013-06-26" "perl v5.14.2" "User Contributed Perl Documentation"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -158,7 +158,10 @@ Fraction overlap with existing gene to call the gene pre-existing. [0.05]
 tblastn evalue cutoff. [1e\-30]
 .IP "\-length" 4
 .IX Item "-length"
-minimum tblast hit length (fraction of query length). [0.75]
+minimum tblast hit length (fraction of query length). [0.80]
+.IP "\-x" 4
+.IX Item "-x"
+Fraction of query PEGs that must have good overlapping hits (>=). [0.5]
 .IP "\-name" 4
 .IX Item "-name"
 Name of tblastn output file directoy. ['passed_tblastn']
@@ -188,9 +191,10 @@ used for the tblastn query.
 .IX Item "2) 'overlapping_gene' OR 'new_gene'"
 .PD
 .PP
-If all queries have good hits to a genome region
-overlapping a pre-existing gene, the query contig
-from FORAGer is considered pre-existing.
+If '\-x' fraction of query PEGs have good overlapping
+hits to pre-existing genes, the query contig
+from FORAGer is considered pre-existing or an 
+artefact (i.e. not a real new gene).
 .PP
 If the presence-absence & screening summary
 files from FORAGer_screen.pl are provided, both
@@ -204,7 +208,7 @@ summary & the binary pass/fail column will reflect
 the tblastn results.
 .SS "Requires:"
 .IX Subsection "Requires:"
-db_TBlastN_wrapper.py
+\&\s-1ITEP\s0 & db_TBlastN_wrapper.py
 .SH "EXAMPLES"
 .IX Header "EXAMPLES"
 .SS "Basic Usage:"
