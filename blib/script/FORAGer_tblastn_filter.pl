@@ -53,7 +53,7 @@ foreach my $infile (keys %$files_r){
 print STDERR "\n...tblastn output files written to $outdir\n\n" unless $verbose;
 
 # writing whether gene exists where cluster blasted #
-foreach my $cluster (keys %res){
+foreach my $cluster (sort {$a<=>$b} keys %res){
 	print join("\t", $cluster, $res{$cluster}), "\n";
 	}
 
