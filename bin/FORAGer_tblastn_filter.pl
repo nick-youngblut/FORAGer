@@ -8,50 +8,75 @@ use Data::Dumper;
 use Getopt::Long;
 use File::Spec;
 use Parallel::ForkManager;
+use File::Path qw/remove_tree/;
 
 ### args/flags
 pod2usage("$0: No files given.") if ((@ARGV == 0) && (-t STDIN));
 
-my ($verbose, $runID, $org);
+my ($verbose, $runID, $fig, $PA_in, $screen_in);
 my $overlap = 0.05;
 my $evalue = "1e-30";
+my $length = 0.75;
+my $outdir = "passed_tblastn";
 GetOptions(
 		"runID=s" => \$runID,
-		"organism=s" => \$org,
+		"fig=s" => \$fig,
 		"overlap=f" => \$overlap,
 		"evalue=s" => \$evalue,
+		"name=s" => \$outdir,
+		"PA=s" => \$PA_in,
+		"screen=s" => \$screen_in,
 	   "verbose" => \$verbose,
 	   "help|?" => \&pod2usage # Help
 	   );
 
 ### I/O error & defaults
 die " ERROR: provide a directory!\n" unless $ARGV[0];
-$ARGV[0] = File::Spec->rel2abs($ARGV[0]);
 die " ERROR: provide a cluster runID!\n" unless $runID;
-die " ERROR: provide an organism ID!\n" unless $org;
+die " ERROR: provide an organism ID!\n" unless $fig;
+$ARGV[0] = File::Spec->rel2abs($ARGV[0]);
+$outdir = File::Spec->rel2abs($outdir);
+
 
 ### MAIN
+# getting passed contig file names #
 my $files_r = get_file_names($ARGV[0]);
 
 # tblastn #
+make_tblastn_dir($outdir);
 my %res;
-foreach my $file (keys %$files_r){
-	call_tblastn_wrapper($file, $files_r->{$file}, $runID, $org, \%res);
+foreach my $infile (keys %$files_r){
+	call_tblastn_wrapper($infile, $outdir, $files_r->{$infile}, $runID, $fig, \%res);
 	}
 
+# writing whether gene exists where cluster blasted #
 foreach my $cluster (keys %res){
 	print join("\t", $cluster, $res{$cluster}), "\n";
 	}
 
 ### Subroutines
+sub make_tblastn_dir{
+	my ($outdir) = @_;
+	remove_tree($outdir) if -d $outdir;
+	mkdir $outdir or die $!;
+	}
+
 sub call_tblastn_wrapper{
-	my ($file, $cluster, $runID, $org, $res_r) = @_;
-	my $cmd = "printf \"$runID\\t$cluster\\n\" | db_getClusterGeneInformation.py | db_TBlastN_wrapper.py -o $org |";
-	print STDERR "$cmd\n" unless $verbose;
+	my ($infile, $outdir, $cluster, $runID, $fig, $res_r) = @_;
+	
+	# opening pipe for db_TBlastN_wrapper.py #
+	my $cmd = "printf \"$runID\\t$cluster\\n\" | db_getClusterGeneInformation.py | db_TBlastN_wrapper.py -o $fig |";
+		#print STDERR "$cmd\n" unless $verbose;
 	open PIPE, $cmd or die $!;
 	
+	# making tblast output file #
+	(my $tblastn_out = $infile) =~ s/\.[^.]+$|$/_blastn.txt/;
+	open OUT, ">$outdir/$tblastn_out" or die $!;
+	
+	# reading from PIPE #
 	while(<PIPE>){
-		next if $res_r->{$cluster} && $res_r->{$cluster} eq "exists"; 
+		print OUT;
+		next if $res_r->{$cluster} && $res_r->{$cluster} eq "exists"; 	# skip if already determined to exist
 		
 		chomp;
 		my @line = split /\t/;
@@ -61,7 +86,8 @@ sub call_tblastn_wrapper{
 			}
 		else{ $res_r->{$cluster} = "new gene" };
 		}
-	close PIPE;	
+	close PIPE;
+	close OUT;
 	}
 
 sub get_file_names{
@@ -101,9 +127,9 @@ FORAGer_tblastn_filter.pl [flags] directory
 
 Cluster runID.
 
-=item -organism
+=item -fig
 
-ITEP organim ID (FIG).
+ITEP organim FIG ID.
 
 =back
 
