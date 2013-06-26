@@ -272,8 +272,22 @@ perldoc FORAGer_tblastn_filter.pl
 Use tblastn to determine which of the 'passed'
 contigs for FORAGer_screen.pl overlap with 
 pre-existing genes in the query genome. 
-All of the genes in the focal cluster will be
-used for the tblastn query. 
+All of the PEGs in the focal cluster will be
+used for the tblastn query.
+
+=head3 PEG tblastn hit 'overlapping_gene' criteria:
+
+=over
+
+=item * 	The e-value cutoff must be met.
+
+=item * 	The hit length cutoff must be met.
+
+=item * 	The hit must be on the same strand as a pre-existing gene.
+
+=item * 	The hit must overlap to X% as the pre-existing gene.
+
+=back 
 
 =head3 Output to STDOUT: 
 
