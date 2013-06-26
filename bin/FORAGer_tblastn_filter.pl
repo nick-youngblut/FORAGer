@@ -7,7 +7,6 @@ use Pod::Usage;
 use Data::Dumper;
 use Getopt::Long;
 use File::Spec;
-use Parallel::ForkManager;
 use File::Path qw/remove_tree/;
 
 ### args/flags
@@ -16,7 +15,7 @@ pod2usage("$0: No files given.") if ((@ARGV == 0) && (-t STDIN));
 my ($verbose, $runID, $fig, $PA_in, $screen_in);
 my $overlap = 0.05;
 my $evalue = "1e-30";
-my $length = 0.75;
+my $length = 0.80;
 my $outdir = "passed_tblastn";
 GetOptions(
 		"runID=s" => \$runID,
@@ -145,7 +144,7 @@ sub call_tblastn_wrapper{
 	# reading from PIPE #
 	while(<PIPE>){
 		print OUT;
-		next if $res_r->{$cluster} && $res_r->{$cluster} eq "new_gene"; 	# skip if already determined to exist
+		last if exists $res_r->{$cluster} && $res_r->{$cluster} eq "overlapping_gene";  	# skip if already determined to exist
 		
 		chomp;
 		my @line = split /\t/;
@@ -155,8 +154,8 @@ sub call_tblastn_wrapper{
 			$line[6]/$line[1] >= $length){		# tblastn hit >= X% query length
 
 			# overlapping with alread called gene? #
-			if($line[11] eq "SAMESTRAND" && 		# gene already called on same strand
-				$line[15] >= $overlap){				# gene overlaps w/ tblastn hit
+			if($line[11] eq "SAMESTRAND" && 			# gene already called on same strand
+				$line[15] >= $overlap){					# gene overlaps w/ tblastn hit
 				$res_r->{$cluster} = "overlapping_gene";		
 				}	
 			else{
@@ -235,7 +234,7 @@ tblastn evalue cutoff. [1e-30]
 
 =item -length
 
-minimum tblast hit length (fraction of query length). [0.75]
+minimum tblast hit length (fraction of query length). [0.80]
 
 =item -name
 
@@ -269,7 +268,7 @@ used for the tblastn query.
 
 =back
 
-If all queries have good hits to a genome region
+Any of the queries have good hits to a genome region
 overlapping a pre-existing gene, the query contig
 from FORAGer is considered pre-existing. 
 
