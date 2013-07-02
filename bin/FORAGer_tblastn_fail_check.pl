@@ -16,17 +16,18 @@ my ($verbose, $runID, $fig, $PA_in, $screen_bool);
 my $overlap = 0.80;
 my $evalue = "1e-30";
 my $length = 0.8;
-my $outdir = "fail_check_tblastn";
-my $hit_frac = 1;
+my $outdir = "TblastnFailCheck";
+my $hit_frac = 0.5;
 GetOptions(
-		"runID=s" => \$runID,
+		"runID=s" => \$runID,				# cluster run ID
 		"fig=s" => \$fig,					# FIG query
 		"overlap=f" => \$overlap,			# overlap
 		"evalue=s" => \$evalue,				# evalue cutoff for 'good' hit
 		"length=f" => \$length,				# length cutoff for 'good' hit
 		"name=s" => \$outdir,				# output ditrection name
 		"screen" => \$screen_bool,			# update screen? [TRUE]
-		"x=f" => \$hit_frac,			# fraction of PEGs in cluster that must have an good overlapping hit
+		"x=f" => \$hit_frac,				# fraction of PEGs in cluster that must have an good overlapping hit
+		"PA=s" => \$PA_in,					# presence-absence file input
 	   "verbose" => \$verbose,
 	   "help|?" => \&pod2usage # Help
 	   );
@@ -59,7 +60,7 @@ foreach my $cluster (sort {$a<=>$b} keys %res){
 	}
 
 # making tblastn-passed table #
-make_tblastn_passed_PA(\%res);
+make_tblastn_passed_PA(\%res, $PA_in);
 
 # updating screen summary table #
 update_screen($ARGV[0], \%res) unless $screen_bool;
@@ -72,7 +73,7 @@ sub update_screen{
 	my ($screen_in, $res_r) = @_;
 	
 	open IN, $screen_in or die $!;
-	my $screen_out = "FORAGer_screen_TblastnCheck.txt";
+	my $screen_out = "FORAGer_screen_TblastnFailCheck.txt";
 	open OUT, ">$screen_out" or die $!;
 	
 	while(<IN>){
@@ -103,22 +104,37 @@ sub update_screen{
 
 sub make_tblastn_passed_PA{
 # updating PA; just writing contigs that appear to be read based on tblastn #
-	my ($res_r) = @_;
+	my ($res_r, $PA_in) = @_;
 
-	my $PA_out = "FORAGer_PA_TblastnCheck.txt";
-	open OUT, ">$PA_out" or die $!;
+	# output #
+	my $outname = "FORAGer_PA_TblastnFailCheck.txt";
+	unlink $outname if -e $outname;
+	open OUT, ">>$outname";
+		
+	# writing PA table first #
+	if($PA_in){
+		open IN, $PA_in or die $!;
+		while(<IN>){ print OUT; }
+		close IN;
+		}
 	
+	# writing tblastn results #
 	foreach my $cluster (keys %$res_r){
 		next if $cluster eq "gene_not_found";
-		my $user_geneid = join("__", "FORAGer", "cluster$cluster", time());
-		print OUT join("\t", $user_geneid, $fig, "CDS",
+		my $user_geneid = join("cluster$cluster", time());
+		print OUT join("\t", $user_geneid, $fig, "FORAGer_tblastn",
 					"", "", "",
 					$runID, $cluster, "",
 					"", ""), "\n";		
 		}
 	close OUT;
 	
-	print STDERR "...tblastn-checked Pres-Abs file written: $PA_out\n\n" unless $verbose;
+	if($PA_in){
+		print STDERR "...tblastn-fail-check added to PA table: $outname\n\n" unless $verbose;
+		}
+	else{
+		print STDERR "...tblastn-fail-check Pres-Abs file written: $outname\n\n" unless $verbose;
+		}
 	}
 
 sub make_tblastn_dir{
@@ -128,6 +144,7 @@ sub make_tblastn_dir{
 	}
 
 sub call_tblastn_wrapper{
+# calling ITEP tblastn wrapper & filtering the results #
 	my ($cluster, $outdir, $runID, $fig, $res_r) = @_;
 	
 	# getting number of pegs in cluster #
@@ -138,6 +155,7 @@ sub call_tblastn_wrapper{
 	
 	# opening pipe for db_TBlastN_wrapper.py #
 	$cmd = "printf \"$runID\\t$cluster\\n\" | db_getClusterGeneInformation.py | db_TBlastN_wrapper.py -o $fig |";
+	
 	open PIPE, $cmd or die $!;
 	
 	# making tblast output file #
@@ -180,6 +198,7 @@ sub call_tblastn_wrapper{
 
 sub get_failed_clusters{
 # getting clusters that failed according to *screen.txt file #
+## just tblastn on failed clusters ##
 	my ($screen_in) = @_;
 	
 	my %clusters;
@@ -250,6 +269,10 @@ ITEP organim FIG ID.
 
 =over
 
+=item -PA
+
+Presence-absence table from FORAGer_screen.pl (updated if provided).
+
 =item -overlap
 
 Fraction overlap with existing gene to call the gene pre-existing. [0.8]
@@ -284,7 +307,8 @@ perldoc FORAGer_tblastn_filter.pl
 
 Some 'failed' contigs from FORAGer may
 be caused by multiple copies of the gene
-in the genome, which breaks the assembly.
+in the genome which breaks the targeted 
+assembly.
 
 This script uses tblastn to check to see
 if the gene is actually present in the genome.
