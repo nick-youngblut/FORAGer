@@ -46,8 +46,21 @@ with its genome sequence file.
 >213585.6	B_subtilis.fna
 
 
-### Mapping reads
-Example files for this exercise:
 
-*  qulist 
+### Example files for this exercise:
+
+* query list = 'query_list.txt'
+
+* subject list = 'subject_list.txt'
+
+* query read files = 'query_reads/'
+
+* subject genome files = 'subject_genomes/'
+
+
+### Mapping reads
+
+
+
+
 
