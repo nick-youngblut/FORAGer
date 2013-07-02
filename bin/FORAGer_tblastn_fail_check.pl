@@ -13,7 +13,8 @@ use File::Path qw/remove_tree/;
 pod2usage("$0: No files given.") if ((@ARGV == 0) && (-t STDIN));
 
 my ($verbose, $runID, $fig, $PA_in, $screen_bool);
-my $overlap = 0.80;
+my $overlap = 0.05; 						
+#my $overlap = 0.8;
 my $evalue = "1e-30";
 my $length = 0.8;
 my $outdir = "TblastnFailCheck";
@@ -175,10 +176,14 @@ sub call_tblastn_wrapper{
 			$line[6]/$line[1] >= $length){		# tblastn hit >= X% query length
 
 			# overlapping with alread called gene? #
-			if($line[11] eq "SAMESTRAND" && 			# gene already called on same strand
-				$line[15] >= $overlap){					# gene overlaps w/ tblastn hit	
-				$overlapping{$line[0]} = 1;				# peg has good overlapping hit
-				}	
+			#if($line[11] eq "SAMESTRAND" && 			# gene already called on same strand
+			#	$line[15] > $overlap){					# gene overlaps w/ tblastn hit	
+			#	$overlapping{$line[0]} = 1;				# peg has good overlapping hit
+			#	}
+			if($line[11] ne "SAMESTRAND" && 			# gene already called on same strand
+				$line[15] < $overlap){
+				$overlapping{$line[0]} = 1;				# peg has little or no overlap
+				}
 			}
 		}
 	close PIPE;
