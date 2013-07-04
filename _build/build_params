@@ -114,6 +114,7 @@ do{ my $x = [
                              './bin/FORAGer_pass_fail.pl',
                              './bin/FORAGer_tblastn_filter.pl',
                              './bin/FORAGer_mapper.pl',
+                             './bin/FORAGer_tblastn_fail_check.pl',
                              './bin/FORAGer.pl',
                              './bin/FORAGer_screen.pl',
                              './bin/FORAGer_assemble.pl',

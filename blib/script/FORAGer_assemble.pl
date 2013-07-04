@@ -179,7 +179,7 @@ FORAGer_assemble.pl -- batch assembly of read files from FORAGer.pl
 
 =head1 SYNOPSIS
 
-FORAGer_assemble.pl [flags] > assembly_file_list.txt
+FORAGer_assemble.pl [flags]
 
 =head2 Required flags
 

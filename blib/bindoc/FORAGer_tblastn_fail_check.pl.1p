@@ -123,88 +123,119 @@
 .rm #[ #] #H #V #F C
 .\" ========================================================================
 .\"
-.IX Title "FORAGER_MAPPER 1"
-.TH FORAGER_MAPPER 1 "2013-07-03" "perl v5.14.2" "User Contributed Perl Documentation"
+.IX Title "FORAGER_TBLASTN_FAIL_CHECK 1"
+.TH FORAGER_TBLASTN_FAIL_CHECK 1 "2013-07-03" "perl v5.14.2" "User Contributed Perl Documentation"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
 .nh
 .SH "NAME"
-FORAGer_mapper.pl \-\- Mapping reads from query genomes to all reference genomes
+FORAGer_tblastn_filter.pl \-\- use tblastn to filter out false 'passed' FORAGer contigs
 .SH "SYNOPSIS"
 .IX Header "SYNOPSIS"
-FORAGer_mapper.pl [flags] [query_directory] [subject_directory] > sam_index.txt
-.SS "Required flags"
-.IX Subsection "Required flags"
-.IP "\-query" 4
-.IX Item "-query"
-List file; tab-delimited; no header; columns:
-.RS 4
-.IP "\(bu" 4
-query_organism_name
-.IP "\(bu" 4
-query_forward_read_file (or all reads file)
-.IP "\(bu" 4
-query_reverse_read_file (or blank)
-.RE
-.RS 4
-.RE
-.IP "\-subject" 4
-.IX Item "-subject"
-List file; tab-delimited; no header; columns:
-.RS 4
-.IP "\(bu" 4
-subject_FIG_ID
-.IP "\(bu" 4
-subject_fasta
-.RE
-.RS 4
-.RE
-.SS "Optional flags"
-.IX Subsection "Optional flags"
-.IP "\-params" 4
-.IX Item "-params"
-Parameters passed to bowtie2 (besides '\-x, \-S, \-1, \-2'). [\-k 10]
-.IP "\-extra" 4
-.IX Item "-extra"
-Parameters appended to '\-params'. []
-.IP "\-forks" 4
-.IX Item "-forks"
-Number of parallel calls of bowtie2. [1]
-.IP "\-verbose" 4
-.IX Item "-verbose"
-Verbose output. [\s-1TRUE\s0]
-.IP "\-help" 4
-.IX Item "-help"
-This help message.
+FORAGer_tblastn_filter.pl [flags] FORAGer_screen.txt
+.SS "required flags"
+.IX Subsection "required flags"
+.IP "\-runID" 4
+.IX Item "-runID"
+Cluster runID.
+.IP "\-fig" 4
+.IX Item "-fig"
+\&\s-1ITEP\s0 organim \s-1FIG\s0 \s-1ID\s0.
+.SS "optional flags"
+.IX Subsection "optional flags"
+.IP "\-PA" 4
+.IX Item "-PA"
+Presence-absence table from FORAGer_screen.pl (updated if provided).
+.IP "\-overlap" 4
+.IX Item "-overlap"
+Fraction overlap with existing gene to call the gene pre-existing. [0.8]
+.IP "\-evalue" 4
+.IX Item "-evalue"
+tblastn evalue cutoff. [1e\-30]
+.IP "\-length" 4
+.IX Item "-length"
+minimum tblast hit length (fraction of query length). [0.8]
+.IP "\-x" 4
+.IX Item "-x"
+Fraction of query PEGs that must have good overlapping hits (>=). [0.5]
+.IP "\-name" 4
+.IX Item "-name"
+Name of tblastn output file directoy. ['fail_check_tblastn']
+.IP "\-v	Verbose output" 4
+.IX Item "-v	Verbose output"
+.PD 0
+.IP "\-h	This help message" 4
+.IX Item "-h	This help message"
+.PD
 .SS "For more information:"
 .IX Subsection "For more information:"
-perldoc FORAGer_mapper.pl
+perldoc FORAGer_tblastn_filter.pl
 .SH "DESCRIPTION"
 .IX Header "DESCRIPTION"
-Just a wrapper for bowtie2 to facilitate mapping of the query reads
-to all of the subject (reference) genomes.
+Some 'failed' contigs from FORAGer may
+be caused by multiple copies of the gene
+in the genome which breaks the targeted 
+assembly.
 .PP
-Output \s-1SAM\s0 file naming: 'query'\-'subject'.sam
+This script uses tblastn to check to see
+if the gene is actually present in the genome.
 .PP
-By default, the top 10 hits for each read are kept (bowtie2 param: '\-k 10').
-.SS "'sam_index.txt'"
-.IX Subsection "'sam_index.txt'"
-3 columns: sam_file, subject_FIG_ID, query_organism_name
+\fIGene tblastn hit 'presence' criteria:\fR
+.IX Subsection "Gene tblastn hit 'presence' criteria:"
+.IP "\(bu" 4
+The e\-value cutoff must be met.
+.IP "\(bu" 4
+The hit length cutoff must be met.
+.IP "\(bu" 4
+The hit must be on the same strand as a pre-existing gene.
+.IP "\(bu" 4
+The hit must overlap to X% as the pre-existing gene.
+.PP
+\fIOutput to \s-1STDOUT:\s0\fR
+.IX Subsection "Output to STDOUT:"
+.IP "1) cluster_id" 4
+.IX Item "1) cluster_id"
+.PD 0
+.IP "2) 'gene_exists' \s-1OR\s0 'gene_not_found'" 4
+.IX Item "2) 'gene_exists' OR 'gene_not_found'"
+.PD
+.PP
+If '\-x' fraction of query PEGs have good overlapping
+hits to pre-existing genes, the query contig
+from FORAGer is considered pre-existing or an 
+artefact (i.e. not a real new gene).
+.PP
+If the presence-absence & screening summary
+files from FORAGer_screen.pl are provided, both
+tables are updated with the tblastn information:
+.IP "\(bu" 4
+Only tblastn-passed contigs will be written to 
+the \s-1PA\s0 table.
+.IP "\(bu" 4
+The screen summary table will have a final tblastn
+summary & the binary pass/fail column will reflect
+the tblastn results.
+.SS "Requires:"
+.IX Subsection "Requires:"
+\&\s-1ITEP\s0 & db_TBlastN_wrapper.py
 .SH "EXAMPLES"
 .IX Header "EXAMPLES"
-.SS "Basic Usage"
-.IX Subsection "Basic Usage"
-FORAGer_mapper.pl \-q ./query/ \-s ./subject/ \-list query_list.txt
-.SS "Forking & multiple bowtie2 threads"
-.IX Subsection "Forking & multiple bowtie2 threads"
-FORAGer_mapper.pl \-q ./query/ \-s ./subject/ \-list query_list.txt \-f 5 \-p \*(L"\-k 10 \-p 4\*(R"
+.SS "Basic Usage:"
+.IX Subsection "Basic Usage:"
+FORAGer_tblastn_filter.pl \-r mazei_I_2.0_c_0.4_m_maxbit \-fig 2209.17 Mapped2Cluster_query_passed/
+.SS "Updating \s-1PA\s0 and screen files"
+.IX Subsection "Updating PA and screen files"
+FORAGer_tblastn_filter.pl \-r mazei_I_2.0_c_0.4_m_maxbit \-fig 2209.17 \-PA FORAGer_PA.txt \-screen FORAGer_screen.txt Mapped2Cluster_query_passed/
+.SS "Altering tblastn 'overlapping_gene' cutoffs"
+.IX Subsection "Altering tblastn 'overlapping_gene' cutoffs"
+FORAGer_tblastn_filter.pl \-r mazei_I_2.0_c_0.4_m_maxbit \-fig 2209.17 \-o 0.2 \-l 0.9 Mapped2Cluster_query_passed/
 .SH "AUTHOR"
 .IX Header "AUTHOR"
 Nick Youngblut <nyoungb2@illinois.edu>
 .SH "AVAILABILITY"
 .IX Header "AVAILABILITY"
-sharchaea.life.uiuc.edu:/home/git/ITEP_PopGen/
+sharchaea.life.uiuc.edu:/home/git/FORAGer/
 .SH "COPYRIGHT"
 .IX Header "COPYRIGHT"
 Copyright 2010, 2011

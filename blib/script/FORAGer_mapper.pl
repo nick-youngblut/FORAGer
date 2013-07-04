@@ -185,11 +185,11 @@ __END__
 
 =head1 NAME
 
-FORAGer_mapping.pl -- Mapping reads from query genomes to all reference genomes
+FORAGer_mapper.pl -- Mapping reads from query genomes to all reference genomes
 
 =head1 SYNOPSIS
 
-FORAGer_mapping.pl [flags] [query_directory] [subject_directory] > sam_index.txt
+FORAGer_mapper.pl [flags] [query_directory] [subject_directory] > sam_index.txt
 
 =head2 Required flags
 
@@ -251,7 +251,7 @@ This help message.
 
 =head2 For more information:
 
-perldoc FORAGer_mapping.pl
+perldoc FORAGer_mapper.pl
 
 =head1 DESCRIPTION
 
@@ -270,11 +270,11 @@ By default, the top 10 hits for each read are kept (bowtie2 param: '-k 10').
 
 =head2 Basic Usage
 
-FORAGer_mapping.pl -q ./query/ -s ./subject/ -list query_list.txt
+FORAGer_mapper.pl -q ./query/ -s ./subject/ -list query_list.txt
 
 =head2 Forking & multiple bowtie2 threads
 
-FORAGer_mapping.pl -q ./query/ -s ./subject/ -list query_list.txt -f 5 -p "-k 10 -p 4"
+FORAGer_mapper.pl -q ./query/ -s ./subject/ -list query_list.txt -f 5 -p "-k 10 -p 4"
 
 =head1 AUTHOR
 
