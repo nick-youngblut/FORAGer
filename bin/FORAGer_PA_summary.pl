@@ -33,6 +33,7 @@ my ($PA_user_r, $toi_user_r) = parse_PA($ARGV[1], $taxa_r);
 ## determining core/variable & copy ##
 my $core_var_ITEP_r = core_var_copy_PA($PA_ITEP_r, $toi_ITEP_r);
 my $core_var_user_r = core_var_copy_PA($PA_user_r, $toi_user_r);
+
 ## writing summary ##
 write_core_var_summary($core_var_ITEP_r, "ITEP");
 write_core_var_summary($core_var_user_r, "user");
@@ -48,18 +49,21 @@ sub core_var_conflicts{
 	my %conflicts;
 	foreach my $cluster (keys %$core_var_ITEP_r){
 		if(exists $core_var_user_r->{$cluster}){		# intersection
+			my $status;
 			if($core_var_ITEP_r->{$cluster}{'core_var'} ne
 				$core_var_user_r->{$cluster}{'core_var'} ||
 				$core_var_ITEP_r->{$cluster}{'copy'} ne
 				$core_var_user_r->{$cluster}{'copy'} ){
-				
-				print join("\t", "Conflict:", $cluster, 
-					"Present", "Present", 
-					$core_var_ITEP_r->{$cluster}{'core_var'}, 
-					$core_var_ITEP_r->{$cluster}{'copy'},
-					$core_var_user_r->{$cluster}{'core_var'}, 
-					$core_var_user_r->{$cluster}{'copy'} ), "\n";	
+				$status = "Conflict:"
 				}
+			else{ $status = "Consistent:" }	
+			
+			print join("\t", $status, $cluster, 
+				"Present", "Present", 
+				$core_var_ITEP_r->{$cluster}{'core_var'}, 
+				$core_var_ITEP_r->{$cluster}{'copy'},
+				$core_var_user_r->{$cluster}{'core_var'}, 
+				$core_var_user_r->{$cluster}{'copy'} ), "\n";	
 			}
 		else{									# ITEP-specific
 			print join("\t", "Conflict:", $cluster, "Present", "Absent",
@@ -68,12 +72,13 @@ sub core_var_conflicts{
 			}
 		}
 	foreach my $cluster (keys %$core_var_user_r){			# user-specific
-		print join("\t", "Conflict:", $cluster, "Absent", "Present", "NA", "NA",
+		unless(exists $core_var_ITEP_r->{$cluster}){
+			print join("\t", "Conflict:", $cluster, "Absent", "Present", "NA", "NA",
 						$core_var_user_r->{$cluster}{'core_var'}, 
 						$core_var_user_r->{$cluster}{'copy'} ), "\n";
+			}
 		}
 	}
-
 
 sub write_core_var_summary{
 # counting number of core/variable & single/multi
@@ -183,6 +188,7 @@ sub parse_PA{
 		}
 	else{ @toi = @header[3..$#header]; }
 	
+		#print Dumper %PA; exit;
 	return \%PA, \@toi;
 	}
 		
@@ -210,15 +216,19 @@ __END__
 
 =head1 NAME
 
-template.pl -- script template
+FORAGer_PA_summary.pl -- Compare ITEP & FORAGer presence-absence tables
 
 =head1 SYNOPSIS
 
-template.pl [options] < input > output
+FORAGer_PA_summary.pl [options] ITEP_PA.txt FORAGer_PA.txt > summary.txt
 
 =head2 options
 
 =over
+
+=item -taxa
+
+A file with a list of taxon names to examine in the pres-abs tables.
 
 =item -v	Verbose output
 
@@ -228,24 +238,27 @@ template.pl [options] < input > output
 
 =head2 For more information:
 
-perldoc template.pl
+perldoc FORAGer_PA_summary.pl
 
 =head1 DESCRIPTION
 
-The flow of execution is roughly:
-   1) Step 1
-   2) Step 2
-   3) Step 3
+Compare ITEP and FORAGer gene cluster presence-absence tables.
+
+=head2 Adding FORAGer pres-abs data to ITEP DB
+
+FORAGer_screen.pl outputs a *PA.txt file.
+Move *PA.txt file to $ITEP_HOME/userdata/ & rename
+'user_genes'. Run ./main5.sh
+
+ITEP table: db_getPresenceAbsenceTable.py -r mazei_I_2.0_c_0.4_m_maxbit -i
+
+FORAGer table: db_getPresenceAbsenceTable.py -r mazei_I_2.0_c_0.4_m_maxbit -u
 
 =head1 EXAMPLES
 
 =head2 Usage method 1
 
-template.pl <read1.fastq> <read2.fastq> <output directory or basename>
-
-=head2 Usage method 2
-
-template.pl <library file> <output directory or basename>
+FORAGer_PA_summary.pl <(db_getPresenceAbsenceTable.py -r mazei_I_2.0_c_0.4_m_maxbit -i ) <(db_getPresenceAbsenceTable.py -r mazei_I_2.0_c_0.4_m_maxbit -u) -t taxa_list.txt > summary.txt
 
 =head1 AUTHOR
 
@@ -253,7 +266,7 @@ Nick Youngblut <nyoungb2@illinois.edu>
 
 =head1 AVAILABILITY
 
-sharchaea.life.uiuc.edu:/home/git/
+sharchaea.life.uiuc.edu:/home/git/FORAGer/
 
 =head1 COPYRIGHT
 
