@@ -149,7 +149,7 @@ sub write_PA_table{
 			die " ERROR: $passed_contig not found in contig file!\n" 
 				unless exists $contigs_r->{$passed_contig};
 			
-			my $user_geneid = join("__", $passed_contig, time());
+			my $user_geneid = join("__", "FORAGer", $passed_contig, time());
 			print $PA_fh join("\t", $user_geneid, $query_name, "FORAGer",
 					"", "", "",
 					$runID, $cluster_id, $contigs_r->{$passed_contig},

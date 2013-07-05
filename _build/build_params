@@ -118,6 +118,7 @@ do{ my $x = [
                              './bin/FORAGer.pl',
                              './bin/FORAGer_screen.pl',
                              './bin/FORAGer_assemble.pl',
+                             './bin/FORAGer_PA_summary.pl',
                              './bin/db_filterGeneInfoTable.pl'
                            ],
          'build_script' => 'Build',
