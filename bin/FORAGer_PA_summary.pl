@@ -7,62 +7,110 @@ use Pod::Usage;
 use Data::Dumper;
 use Getopt::Long;
 use File::Spec;
+use List::Util qw/sum/;
 
 ### args/flags
 pod2usage("$0: No files given.") if ((@ARGV == 0) && (-t STDIN));
 
-my ($verbose, $runID, $taxa_in);
+my ($verbose, $taxa_in);
 GetOptions(
-	   "runID=s" => \$runID,
 	   "taxa=s" => \$taxa_in,
 	   "verbose" => \$verbose,
 	   "help|?" => \&pod2usage # Help
 	   );
 
 ### I/O error & defaults
-die " ERROR: provide a runID!\n" unless $runID;
 
 ### MAIN
 # loading taxa of interest #
 my $taxa_r = load_taxa_list($taxa_in) if $taxa_in;
 
-# parsing PA table #
-my ($PA_r, $toi_r) = parse_PA($runID, $taxa_r);
+# parsing PA tables #
+my ($PA_ITEP_r, $toi_ITEP_r) = parse_PA($ARGV[0], $taxa_r);
+my ($PA_user_r, $toi_user_r) = parse_PA($ARGV[1], $taxa_r);
 
 # core/variable; multi-copy #
-core_var_copy_PA($PA_r, $toi_r);
-
-# overlapping presence #
-
+## determining core/variable & copy ##
+my $core_var_ITEP_r = core_var_copy_PA($PA_ITEP_r, $toi_ITEP_r);
+my $core_var_user_r = core_var_copy_PA($PA_user_r, $toi_user_r);
+## writing summary ##
+write_core_var_summary($core_var_ITEP_r, "ITEP");
+write_core_var_summary($core_var_user_r, "user");
+## determining conflicts in core/variable ##
+core_var_conflicts($core_var_ITEP_r, $core_var_user_r);
 
 
 ### subroutines
-# quantify:
-## N-taxa w/ ITEP gene
-## N-taxa w/ FORAGer gene
-## max number ITEP genes 
-## N overlap in presence
-## N conflict in presence (FORAGer: A, ITEP: P)
-## N conflict in presence (FORAGer: P, ITEP: A)
+sub core_var_conflicts{
+# determining conflicts in core/var & copy #
+	my ($core_var_ITEP_r, $core_var_user_r) = @_;
+	
+	my %conflicts;
+	foreach my $cluster (keys %$core_var_ITEP_r){
+		if(exists $core_var_user_r->{$cluster}){		# intersection
+			if($core_var_ITEP_r->{$cluster}{'core_var'} ne
+				$core_var_user_r->{$cluster}{'core_var'} ||
+				$core_var_ITEP_r->{$cluster}{'copy'} ne
+				$core_var_user_r->{$cluster}{'copy'} ){
+				
+				print join("\t", "Conflict:", $cluster, 
+					"Present", "Present", 
+					$core_var_ITEP_r->{$cluster}{'core_var'}, 
+					$core_var_ITEP_r->{$cluster}{'copy'},
+					$core_var_user_r->{$cluster}{'core_var'}, 
+					$core_var_user_r->{$cluster}{'copy'} ), "\n";	
+				}
+			}
+		else{									# ITEP-specific
+			print join("\t", "Conflict:", $cluster, "Present", "Absent",
+					$core_var_ITEP_r->{$cluster}{'core_var'}, 
+					$core_var_ITEP_r->{$cluster}{'copy'}, "NA", "NA"), "\n";
+			}
+		}
+	foreach my $cluster (keys %$core_var_user_r){			# user-specific
+		print join("\t", "Conflict:", $cluster, "Absent", "Present", "NA", "NA",
+						$core_var_user_r->{$cluster}{'core_var'}, 
+						$core_var_user_r->{$cluster}{'copy'} ), "\n";
+		}
+	}
 
+
+sub write_core_var_summary{
+# counting number of core/variable & single/multi
+	my ($core_var_r, $source) = @_;
+	
+	my %summary;
+	foreach my $cluster (keys %$core_var_r){
+		die " LOGIC ERROR: $!\n" unless exists $core_var_r->{$cluster};
+		$summary{ join("_", $core_var_r->{$cluster}{'core_var'}, 
+						   $core_var_r->{$cluster}{'copy'}) }++;
+		} 
+	
+	# Summary #
+	print STDERR "\n" if $source eq "user";
+	print STDERR "### $source ###\n";
+	foreach my $cat (keys %summary){
+		print STDERR join("\t", "$cat:", $summary{$cat}), "\n";
+		}
+	print STDERR join("\t", "total:", sum values %summary), "\n";
+	}
 
 sub core_var_copy_PA{
 # determining which clusters are core, variable, and multi-copy #
-
 	my ($PA_r, $toi_r) = @_;
 	
-		print Dumper $PA_r; exit;
+		#print Dumper $PA_r; exit;
 	
 	my %core_var;
 	foreach my $cluster (keys %$PA_r){
 		# core/variable #
-		my $ntaxa_ITEP = scalar keys %{$PA_r->{$cluster}{"ITEP"}};
+		my $ntaxa_ITEP = scalar keys %{$PA_r->{$cluster}};
 		my $max_N = 0;
 		
 		# number of genes per taxon #
-		foreach my $taxon (keys %{$PA_r->{$cluster}{"ITEP"}} ){
+		foreach my $taxon (keys %{$PA_r->{$cluster}} ){
 			# max number of ITEP genes 
-			my $N_genes = scalar @{$PA_r->{$cluster}{"ITEP"}{$taxon}};
+			my $N_genes = scalar @{$PA_r->{$cluster}{$taxon}};
 			$max_N = $N_genes if $N_genes > $max_N;
 			}
 		
@@ -83,16 +131,19 @@ sub core_var_copy_PA{
 			}
 		}
 	
-		print Dumper %core_var; exit;
+		#print Dumper %core_var; exit;
+	return \%core_var;
 	}
 
 sub parse_PA{
 # parsing PA table from ITEP #
-	my ($runID, $taxa_r) = @_;
+	my ($infile, $taxa_r) = @_;
+
+	open IN, $infile or die $!;
 
 	my %PA;			# quantify as above
 	my @header;
-	while(<>){
+	while(<IN>){
 		chomp;
 		next if /^\s*$/;
 		
@@ -103,47 +154,38 @@ sub parse_PA{
 		# body #
 		else{
 			my @line = split /\t/;
-			next unless $line[0] eq $runID;
 			
 			for my $i (3..$#line){			# each organism
 				# sanity check #
 				die " ERROR: line $. is not the same length as the header!\n"
 					unless $header[$i];
 				
-				# skipping if don't care #
-				if(%$taxa_r){
+				# skipping taxa if don't care #
+				if($taxa_r){
 					next unless exists $taxa_r->{$header[$i]};
 					}
 					
 				# laoding hash #
 				my @entries = split /;/, $line[$i];
 				
-					#print Dumper $header[$i], @entries; 
-				
 				foreach my $j (@entries){
-					if($j =~ /^NODE/){
-						push(@{$PA{$line[1]}{"FORAGer"}{$header[$i]}}, $j);
-						}
-					else{
-						push(@{$PA{$line[1]}{"ITEP"}{$header[$i]}}, $j) unless $j eq "NONE";
-						}
-					}				
+					push(@{$PA{$line[1]}{$header[$i]}}, $j) unless $j eq "NONE";
+					}			
 				}
 			}
 		}
+	close IN;
 	
 	# N-taxa of interest #
 	my @toi;
-	if(%$taxa_r){
+	if($taxa_r){
 		@toi = keys %$taxa_r;
 		}
 	else{ @toi = @header[3..$#header]; }
 	
-		#print Dumper %PA; exit;
 	return \%PA, \@toi;
 	}
-	
-	
+		
 sub load_taxa_list{
 # loading list of taxa of interest #
 	my ($taxa_in) = @_;
