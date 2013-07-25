@@ -389,7 +389,10 @@ sub load_index{
 		my @line = split /\t/;
 		$line[0] = File::Spec->rel2abs($line[0]);
 
-		die " ERROR: $line[0] does not exist!\n" unless -e $line[0];
+		unless (-e $line[0]){
+			print STDERR " ERROR: $line[0] does not exist!\n";
+			next;
+			}
 
 		# loading hash #
 		if($line[2]){	# if query name provided
