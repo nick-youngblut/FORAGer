@@ -124,18 +124,21 @@
 .\" ========================================================================
 .\"
 .IX Title "FORAGER_PA_SUMMARY 1"
-.TH FORAGER_PA_SUMMARY 1 "2013-07-04" "perl v5.14.2" "User Contributed Perl Documentation"
+.TH FORAGER_PA_SUMMARY 1 "2013-07-05" "perl v5.14.2" "User Contributed Perl Documentation"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
 .nh
 .SH "NAME"
-template.pl \-\- script template
+FORAGer_PA_summary.pl \-\- Compare ITEP & FORAGer presence\-absence tables
 .SH "SYNOPSIS"
 .IX Header "SYNOPSIS"
-template.pl [options] < input > output
+FORAGer_PA_summary.pl [options] \s-1ITEP_PA\s0.txt FORAGer_PA.txt > summary.txt
 .SS "options"
 .IX Subsection "options"
+.IP "\-taxa" 4
+.IX Item "-taxa"
+A file with a list of taxon names to examine in the pres-abs tables.
 .IP "\-v	Verbose output" 4
 .IX Item "-v	Verbose output"
 .PD 0
@@ -144,27 +147,30 @@ template.pl [options] < input > output
 .PD
 .SS "For more information:"
 .IX Subsection "For more information:"
-perldoc template.pl
+perldoc FORAGer_PA_summary.pl
 .SH "DESCRIPTION"
 .IX Header "DESCRIPTION"
-The flow of execution is roughly:
-   1) Step 1
-   2) Step 2
-   3) Step 3
+Compare \s-1ITEP\s0 and FORAGer gene cluster presence-absence tables.
+.SS "Adding FORAGer pres-abs data to \s-1ITEP\s0 \s-1DB\s0"
+.IX Subsection "Adding FORAGer pres-abs data to ITEP DB"
+FORAGer_screen.pl outputs a *PA.txt file.
+Move *PA.txt file to \f(CW$ITEP_HOME\fR/userdata/ & rename
+\&'user_genes'. Run ./main5.sh
+.PP
+\&\s-1ITEP\s0 table: db_getPresenceAbsenceTable.py \-r mazei_I_2.0_c_0.4_m_maxbit \-i
+.PP
+FORAGer table: db_getPresenceAbsenceTable.py \-r mazei_I_2.0_c_0.4_m_maxbit \-u
 .SH "EXAMPLES"
 .IX Header "EXAMPLES"
 .SS "Usage method 1"
 .IX Subsection "Usage method 1"
-template.pl <read1.fastq> <read2.fastq> <output directory or basename>
-.SS "Usage method 2"
-.IX Subsection "Usage method 2"
-template.pl <library file> <output directory or basename>
+FORAGer_PA_summary.pl <(db_getPresenceAbsenceTable.py \-r mazei_I_2.0_c_0.4_m_maxbit \-i ) <(db_getPresenceAbsenceTable.py \-r mazei_I_2.0_c_0.4_m_maxbit \-u) \-t taxa_list.txt > summary.txt
 .SH "AUTHOR"
 .IX Header "AUTHOR"
 Nick Youngblut <nyoungb2@illinois.edu>
 .SH "AVAILABILITY"
 .IX Header "AVAILABILITY"
-sharchaea.life.uiuc.edu:/home/git/
+sharchaea.life.uiuc.edu:/home/git/FORAGer/
 .SH "COPYRIGHT"
 .IX Header "COPYRIGHT"
 Copyright 2010, 2011
