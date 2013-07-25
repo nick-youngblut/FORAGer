@@ -390,7 +390,7 @@ sub load_index{
 		$line[0] = File::Spec->rel2abs($line[0]);
 
 		unless (-e $line[0]){
-			print STDERR " ERROR: $line[0] does not exist!\n";
+			print STDERR " WARNING: $line[0] does not exist!\n";
 			next;
 			}
 
@@ -472,7 +472,7 @@ sub load_gene_info{
 		}
 	print STDERR "Number of clusters containing genes from provided FIGs: ", scalar keys %cnt, "\n"; exit
 	
-		#print Dumper %gene_start_stop; exit;
+		print Dumper %gene_start_stop; exit;
 	return \%gene_start_stop;		# fig=>cluster=>contig=>start/stop=>value
 	}
 
