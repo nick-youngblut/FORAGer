@@ -12,7 +12,6 @@ use File::Temp qw/ tempdir /;
 use Set::IntervalTree;
 use Storable;
 use Parallel::ForkManager;
-use Bio::DB::Sam;
 
 ### args/flags
 pod2usage("$0: No files given.") if ((@ARGV == 0) && (-t STDIN));
@@ -21,14 +20,12 @@ my ($verbose, @sam_in, $index_in, $warnings_bool, $write_seqs_bool);
 my $gene_extend = 100;
 my $fork = 0;
 my $outdir_name = "Mapped2Cluster";
-my $index_setup;
 GetOptions(
-		"index=s" => \$index_in, 			# an index file of bam_file => FIG_of_ref-genome
-		"extend=i" => \$gene_extend,		# bp to extend beyond gene (5' & 3')
-		"outdir=s" => \$outdir_name, 		# name of output directory
-		"fork=i" => \$fork,					# number of forked processes
-		"ITEP" => \$index_setup, 			# indexed as ITEP db_getClusterGeneInformation.py? [TRUE]
-		"warnings" => \$warnings_bool, 		# write warnings to STDERR? [TRUE]
+		"index=s" => \$index_in, 		# an index file of sam_file => FIG_of_ref-genome
+		"extend=i" => \$gene_extend,	# bp to extend beyond gene (5' & 3')
+		"outdir=s" => \$outdir_name, 	# name of output directory
+		"fork=i" => \$fork,				# number of forked processes
+		"warnings" => \$warnings_bool, 	# write warnings to STDERR? [TRUE]
 		"sequences" => \$write_seqs_bool, 	# writing fasta for each cluter [TRUE]
 	   "verbose" => \$verbose,
 	   "help|?" => \&pod2usage # Help
@@ -41,39 +38,40 @@ die " ERROR: provide an index file!\n" unless $index_in;
 # pulling out reads mapping to each gene region #
 my $index_r = load_index($index_in);
 
-# loading gene info #
-my $gene_start_stop_r = load_gene_info($index_r, $index_setup);
-	
+# loading info from ITEP #
+my $gene_start_stop_r = load_gene_info($index_r, $write_seqs_bool);
 
 # foreach query #
 my $pm = new Parallel::ForkManager($fork);
 foreach my $query_reads (keys %$index_r){		# each query genome
-	print STDERR "### Processing indexed BAM files with reads from: $query_reads ###\n"
+	print STDERR "### Processing SAM files with reads from: $query_reads ###\n"
 		unless $query_reads eq "SINGLE_QUERY";
 
 	# making tmp data directory #
 	my $tmp_dir_o = File::Temp->newdir();
 	my $tmp_dir = $tmp_dir_o->dirname;
 	
-	# foreach BAM file (can fork & merge) # 
-	foreach my $bam_file (keys %{$index_r->{$query_reads}}){
+	# foreach SAM file (can fork & merge) # 
+	foreach my $sam_file (keys %{$index_r->{$query_reads}}){
 		my (%reads_mapped, %mapped_summary);
 	
 		# forking #
 		my $pid = $pm->start and next;
 	
 		# checking for presence of genes in fig #
-		unless (exists $gene_start_stop_r->{$index_r->{$query_reads}{$bam_file}}){
-			print STDERR " WARNING: none of the genes of interest are in FIG->", $index_r->{$query_reads}{$bam_file}, ", skipping\n";
+		unless (exists $gene_start_stop_r->{$index_r->{$query_reads}{$sam_file}}){
+			print STDERR " WARNING: no genes for FIG->", $index_r->{$query_reads}{$sam_file}, ", skipping\n";
 			next;
 			}
 	
 		# finding mapped reads #
-		reads_mapped_to_region($bam_file, $index_r->{$query_reads}{$bam_file}, 
-			$gene_start_stop_r, $gene_extend, \%reads_mapped, \%mapped_summary);	
+		my ($itrees_r, $reads_r) = load_interval_tree($sam_file);
+		reads_mapped_to_region($sam_file, $index_r->{$query_reads}{$sam_file}, 
+			$gene_start_stop_r, $gene_extend, $itrees_r, $reads_r,
+			\%reads_mapped, \%mapped_summary);	
 	
 		# saving data structures #
-		my @parts = File::Spec->splitpath($bam_file);
+		my @parts = File::Spec->splitpath($sam_file);
 		$parts[2] =~ s/\.[^.]+$//;
 		store(\%reads_mapped, "$tmp_dir/$parts[2]\_map");
 		store(\%mapped_summary, "$tmp_dir/$parts[2]\_sum");
@@ -237,71 +235,11 @@ sub merge_hashes{
 	}
 
 sub reads_mapped_to_region{
-# parsing out reads of 1 query that mapped to each gene region of a subject #
-## $gene_start_stop_r = fig=>cluster=>contig=>start/stop=>value
-## foreach gene (start-stop): find reads mapped to gene (from itree) 
-
-	my ($bam_file, $fig, $gene_start_stop_r, 
-		$gene_extend, $reads_mapped_r, $mapped_summary_r) = @_;
-
-	# status #
-	print STDERR "...finding reads mapped to genes of interest in: FIG$fig\n"
-		unless $verbose;
-
-	# loading bam object #
-	my $bamo = Bio::DB::Sam->new(-bam => $bam_file);
-
-	my %warnings;
-		# gene_start_stop = fig->clust->contig->cat->value
-	foreach my $cluster (keys %{$gene_start_stop_r->{$fig}}){					# gene clusters in FIG
-		foreach my $contig (keys %{$gene_start_stop_r->{$fig}{$cluster}}){		# contig 
-			# gene start-end #
-			my $gene_start = $gene_start_stop_r->{$fig}{$cluster}{$contig}{"start"};
-			my $gene_end = $gene_start_stop_r->{$fig}{$cluster}{$contig}{"end"};
-			($gene_start, $gene_end) = flip_se($gene_start, $gene_end)
-				if $gene_start_stop_r->{$fig}{$cluster}{$contig}{"strand"} eq "-";
-			
-			# fetching alignments for query #
-			my @alignments = $bamo->get_features_by_location(-seq_id => $contig,
-																-start => $gene_start,
-																-end => $gene_end);
-																#-type => 'read_pair');
-			unless(@alignments){
-				print STDERR "WARNING: no reads mapped to FIG:$fig -> Contig:$contig -> cluster:$cluster\n"
-					unless $warnings_bool;
-				$mapped_summary_r->{$cluster}{$fig}{"count"} += scalar @alignments;
-				$mapped_summary_r->{$cluster}{$fig}{"length"} = 0;
-				next;
-				}
-
-			# loading read names #
-			foreach my $aln (@alignments){		# read IDs
-				# cluster->read_ID->pair->mapID = read
-				print Dumper $aln;
-				#print Dumper $aln->query->seq_id;
-				#print Dumper $aln->query->dna;
-				#print Dumper $aln->get_tag_values('PAIRED');
-				#print Dumper $aln;
-				#$reads_mapped_r->{$cluster}{$$id[0]}{$$id[1]}{"$fig\__$$id[2]"} = $$id[3];
-				}			
-			
-			}
-		}	
-	exit;	
-		#print Dumper %$reads_mapped_r; exit;
-		#print Dumper %$mapped_summary_r; exit;
-	sub flip_se{
-		my ($start, $end) = @_;
-		return $end, $start;
-		}
-	}
-
-sub reads_mapped_to_region_OLD{
 # parsing out reads that mapped to each gene region #
 ## $gene_start_stop_r = fig=>cluster=>contig=>start/stop=>value
 ## foreach gene (start-stop): find reads mapped to gene (from itree) 
 
-	my ($bam_file, $fig, $gene_start_stop_r, 
+	my ($sam_file, $fig, $gene_start_stop_r, 
 		$gene_extend, $itrees_r, $reads_r, 
 		$reads_mapped_r, $mapped_summary_r) = @_;
 
@@ -354,6 +292,70 @@ sub reads_mapped_to_region_OLD{
 		#print Dumper %$reads_mapped_r; exit;
 		#print Dumper %$mapped_summary_r; exit;
 	}
+
+sub load_interval_tree{
+	my ($sam_file) = @_;
+	
+	# status #
+	print STDERR "...loading $sam_file\n" unless $verbose;
+	my $fh = open_file($sam_file);
+	
+	# loading reads as hash #
+		#open IN, $sam_file or die $!;
+	my %reads;			# contig ->  read_name -> map_ID -> category -> value
+	while(<$fh>){
+		chomp;
+		next if /^@/; 	# skipping header
+		next if /^\s*$/;	# skipping blank lines
+		
+		# parsing #
+		my @line = split /\t/;
+		## filtering ##
+		next if $line[3] eq "" || $line[3] == 0;		# if not mapped
+		
+		## paired end info ##
+		if($line[6] eq "=" and ! eof($fh) ){ 		# if pair mapping
+			my $line2 = <$fh>;		# loading pair
+			my @line2 = split /\t/, $line2;
+			
+			## loading into hash ##
+				# start & stop by + strand
+			$reads{$line[2]}{$line[0]}{1}{$.}{"start"} = $line[3];						# contig->seq->start
+			$reads{$line[2]}{$line[0]}{1}{$.}{"stop"} = $line[3] + length $line[9];		
+			$reads{$line[2]}{$line[0]}{1}{$.}{"nuc"} = $line[9];	
+			
+			$reads{$line2[2]}{$line2[0]}{2}{$.}{"start"} = $line2[3];						# contig->seq->start
+			$reads{$line2[2]}{$line2[0]}{2}{$.}{"stop"} = $line2[3] + length $line2[9];		
+			$reads{$line2[2]}{$line2[0]}{2}{$.}{"nuc"} = $line2[9];			
+			}	
+		else{ 
+			## loading into hash ##
+			$reads{$line[2]}{$line[0]}{1}{$.}{"start"} = $line[3];						# contig->seq->start
+			$reads{$line[2]}{$line[0]}{1}{$.}{"stop"} = $line[3] + length $line[9];		
+			$reads{$line[2]}{$line[0]}{1}{$.}{"nuc"} = $line[9];	
+			}
+		}
+	close $fh;
+	
+	# loading interval tree #
+	my %itrees;
+	foreach my $contig (keys %reads){
+		$itrees{$contig} = Set::IntervalTree->new;		# interval tree for each contig (position by contig)
+		
+		# inserting into interval trees #
+		foreach my $read (keys %{$reads{$contig}}){
+			foreach my $pair (keys %{$reads{$contig}{$read}}){
+				foreach my $map_id (keys %{$reads{$contig}{$read}{$pair}}){
+					$itrees{$contig}->insert(
+							[$read, $pair, $map_id, $reads{$contig}{$read}{$pair}{$map_id}{"nuc"}],
+							$reads{$contig}{$read}{$pair}{$map_id}{"start"} - 1, 
+							$reads{$contig}{$read}{$pair}{$map_id}{"stop"} + 1);
+					}
+				}
+			}
+		}
+	return \%itrees, \%reads;
+	}
 	
 sub open_file{
 # check for compression; open depending on the file extension; return filehandle #
@@ -393,13 +395,11 @@ sub load_index{
 			}
 
 		# loading hash #
-		if($line[3]){	# if query name provided
-			$index{$line[3]}{$line[0]} = $line[2];				# query => bam/cat => value
-			$index{$line[3]}{"__SUBJECT_FASTA__"} = $line[1];						
+		if($line[2]){	# if query name provided
+			$index{$line[2]}{$line[0]} = $line[1];			# query => sam => subject_fig
 			}
 		else{
-			$index{"__SINGLE_QUERY__"}{$line[0]}{"subject_FIG"} = $line[2];		# query => bam/cat => value
-			$index{"__SINGLE_QUERY__"}{"__SUBJECT_FASTA__"} = $line[1];			
+			$index{"SINGLE_QUERY"}{$line[0]} = $line[1];	# query => sam => subject_fig
 			}
 		}
 	close IN;
@@ -409,148 +409,6 @@ sub load_index{
 	}
 
 sub load_gene_info{
-# loading gene info: either ITEP or 'minimal' table indexing #
-#--- standard ---#
-## taxon_ID			(same as index)
-## subject_contig_ID
-## subject_gene_start
-## subject_gene_end
-## subject_gene_strand
-## subject_gene_cluster
-	my ($index_r, $index_setup) = @_;
-	
-
-	# parsing gene info table from STDIN #
-	my %gene_start_stop;
-	while(<>){	
-		chomp;
-		next if /^\s*$/;
-		
-		# parsing #
-		my @line = split /\t/;
-		die " ERROR: row in gene info table must have >= 6 columns!\n"
-			unless scalar @line >= 6;
-		die " ERROR: clustID column should be integers in the last row of the ClusterGeneInformation table\n"
-			unless $line[$#line] =~ /^\d+$/;
-		
-		# setting indexing #
-		my ($FIG, $contig, $start, $end, $strand, $cluster);
-		if($index_setup){		# 'minimal'
-			$FIG = $line[0];
-			$contig = $line[1];
-			$start = $line[2];
-			$end = $line[3];
-			$strand = $line[4];
-			$cluster = $line[5];			
-			}
-		else{					# ITEP
-			($FIG = $line[0]) =~ s/fig\||\.peg.+//g;
-			($contig = $line[4]) =~ s/^$line[2]\.//;
-			$start = $line[5];
-			$end = $line[6];
-			$strand = $line[7];
-			$cluster = $line[$#line];
-			}	
-		
-		# loading hash #
-		$gene_start_stop{$FIG}{$cluster}{$contig}{"start"} = $start;
-		$gene_start_stop{$FIG}{$cluster}{$contig}{"end"} = $end;
-		$gene_start_stop{$FIG}{$cluster}{$contig}{"strand"} = $strand;
-
-	}
-	# sanity check #
-	die " ERROR: no gene information found for gene clusters!\n" if
-		scalar keys %gene_start_stop == 0;		
-	
-		
-	# counting clusters (in provided FIGs) #
-	## getting all figs ##
-	my @figs;
-	foreach my $q (keys %$index_r){
-		foreach my $bam (keys %{$index_r->{$q}}){
-			next if $bam eq "__SUBJECT_FASTA__";
-			push(@figs, $index_r->{$q}{$bam});
-			}
-		}
-	
-	## counting clusters ##
-	my %cnt;
-	foreach my $fig (@figs){
-		print STDERR " WARNING: FIG $fig not found in provided gene cluster info!\n"
-			unless exists $gene_start_stop{$fig} || $warnings_bool; 
-		map{ $cnt{$_}=1 } keys %{$gene_start_stop{$fig}};
-		}
-	print STDERR "Number of clusters containing genes from provided FIGs: ", scalar keys %cnt, "\n";
-
-		print Dumper %gene_start_stop; exit;
-	return \%gene_start_stop;		# fig=>cluster=>contig=>start/stop=>value	
-	}
-
-sub load_gene_info_other{
-# getting geneIDs for a cluster; indexing as follows: #
-## taxon_ID			(same as index)
-## subject_contig_ID
-## subject_gene_start
-## subject_gene_end
-## subject_gene_strand
-## subject_gene_cluster
-
-	my ($index_r) = @_;
-
-	# parsing ITEP output #
-	my %gene_start_stop;
-	while(<>){
-		chomp;
-		next if /^\s*$/;
-		
-		# parsing #
-		my @line = split /\t/;
-		die " ERROR: row in gene info table must have 6 columns!\n"
-			unless scalar @line >= 6;
-		die " ERROR: clustID column should be integers in the last row of the ClusterGeneInformation table\n"
-			unless $line[$#line] =~ /^\d+$/;
-
-		## loading start-stop ##
-		(my $fig = $line[0]) =~ s/fig\||\.peg.+//g;			# FIG number
-		my $contig = $line[1];
-		my $start = $line[2];
-		my $end = $line[3];
-		my $strand = $line[4];
-		my $cluster = $line[5];
-		
-		$gene_start_stop{$fig}{$cluster}{$contig}{"start"} = $start;	# fig->clust->contig->cat->value
-		$gene_start_stop{$fig}{$cluster}{$contig}{"end"} = $end;		# fig->clust->contig->cat->value
-		$gene_start_stop{$fig}{$cluster}{$contig}{"strand"} = $strand;
-		}
-	
-	# sanity check #
-	die " ERROR: no gene information found for gene clusters!\n" if
-		scalar keys %gene_start_stop == 0;
-	
-	# counting clusters (in provided FIGs) #
-	## getting all figs ##
-	my @figs;
-	foreach my $q (keys %$index_r){
-		foreach my $bam (keys %{$index_r->{$q}}){
-			next if $bam eq "__SUBJECT_FASTA__";
-			push(@figs, $index_r->{$q}{$bam});
-			}
-		}
-	
-	## counting clusters ##
-	my %cnt;
-	foreach my $fig (@figs){
-		print STDERR " WARNING: FIG $fig not found in provided gene cluster info!\n"
-			unless exists $gene_start_stop{$fig} || $warnings_bool; 
-		map{ $cnt{$_}=1 } keys %{$gene_start_stop{$fig}};
-		}
-	print STDERR "Number of clusters containing genes from provided FIGs: ", scalar keys %cnt, "\n"; exit
-	
-		#print Dumper %gene_start_stop; exit;
-	return \%gene_start_stop;		# fig=>cluster=>contig=>start/stop=>value
-	}
-
-sub load_gene_info_ITEP{
 # getting geneIDs for a cluster from ITEP #
 	my ($index_r, $write_seqs_bool) = @_;
 
@@ -568,18 +426,21 @@ sub load_gene_info_ITEP{
 			unless $line[$#line] =~ /^\d+$/;
 
 		## loading start-stop ##
-		### FIG
-		(my $fig = $line[0]) =~ s/fig\||\.peg.+//g;
-		### contig_ID
+		(my $fig = $line[0]) =~ s/fig\||\.peg.+//g;			# FIG number
 		$line[4] =~ s/^$line[2]\.//;
-		### strand
-		$gene_start_stop{$fig}{$#line}{$line[4]}{"start"} = $line[5];	# fig->clust->contig->cat->value
-			$gene_start_stop{$fig}{$#line}{$line[4]}{"stop"} = $line[6];	
-		$gene_start_stop{$fig}{$#line}{$line[4]}{"strand"} = $line[7];
+		if($line[7] eq "+"){
+			$gene_start_stop{$fig}{$line[13]}{$line[4]}{"start"} = $line[5];	# fig->clust->contig->cat->value
+			$gene_start_stop{$fig}{$line[13]}{$line[4]}{"stop"} = $line[6];	
+			}
+		elsif($line[7] eq "-"){ 	# if neg strand, flipping
+			$gene_start_stop{$fig}{$line[13]}{$line[4]}{"start"} = $line[6];
+			$gene_start_stop{$fig}{$line[13]}{$line[4]}{"stop"} = $line[5];
+			}
+		else{ die " ERROR: 'strand' must be '+' or '-'\n"; }
 		
 		## loading sequences ##
-		$fna{$#line}{$line[0]} = $line[10]; # cluster=>fig=>nuc_seq
-		$faa{$#line}{$line[0]} = $line[11];
+		$fna{$line[13]}{$line[0]} = $line[10];
+		$faa{$line[13]}{$line[0]} = $line[11];
 		}
 	
 	# sanity check #
@@ -611,7 +472,7 @@ sub load_gene_info_ITEP{
 		}
 	print STDERR "Number of clusters containing genes from provided FIGs: ", scalar keys %cnt, "\n"; exit
 	
-		#print Dumper %gene_start_stop; exit;
+		print Dumper %gene_start_stop; exit;
 	return \%gene_start_stop;		# fig=>cluster=>contig=>start/stop=>value
 	}
 
@@ -644,6 +505,28 @@ sub write_cluster_fasta{
 	print STDERR "...fasta for each cluster written to $outdir\n" unless $verbose;
 	}
 
+sub load_cluster_ids{
+# loading cluster_id file in 'ITEP' format #
+	my ($clusterID_col) = @_;
+	
+	my %clusterID;
+	while(<>){
+		chomp;
+		s/#.+//;
+		next if /^\s$/;
+		
+		my @line = split /\t/;
+		$clusterID{$line[$clusterID_col -1]} = 1;
+		}
+
+		die " ERROR: no clusters provided!\n" if scalar keys %clusterID == 0;
+		
+		print STDERR "Number of clusters provided: ", scalar keys %clusterID, "\n\n"
+			unless $verbose;
+
+		#print Dumper %clusterID; exit;
+	return \%clusterID;
+	}
 
 
 __END__

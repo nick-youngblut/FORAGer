@@ -15,13 +15,13 @@ pod2usage("$0: No files given.") if ((@ARGV == 0) && (-t STDIN));
 
 my ($verbose, $qlist_in, $slist_in);
 my $extra_params = "";
-my $bowtie_params = "-k 10";				# number of best hits to report
+my $bowtie_params = "-k 10";
 my $fork = 0;
 GetOptions(
 	   "query_list=s" => \$qlist_in,			# query directory
 	   "subject_list=s" => \$slist_in,		# subject directory
-	   "forks=i" => \$fork, 				# number of forked mappings
-	   "params=s" => \$bowtie_params,		# params passed to bowtie2
+	   "forks=i" => \$fork, 		# number of forked mappings
+	   "params=s" => \$bowtie_params,	# params passed to bowtie2
 	   "extra=s" => \$extra_params, 		# extra bowtie2 parameters (appended)
 	   "verbose" => \$verbose,
 	   "help|?" => \&pod2usage # Help
@@ -30,16 +30,14 @@ GetOptions(
 ### I/O error & defaults
 my $qdir = $ARGV[0];
 my $sdir = $ARGV[1];
+#die " ERROR: provide a query (read files) directory!\n" unless $qdir;
+#die " ERROR: provide a subject (reference genomes) directory!\n" unless $sdir;
 map{ $_ = File::Spec->rel2abs($_) if $_ } ($qdir, $sdir);
 map{ die " ERROR: $_ not found!\n" if $_ && ! -d $_ } ($qdir, $sdir);
 
 die " ERROR: provide a query list file!\n" unless $qlist_in;
 die " ERROR: provide a subject list file!\n" unless $slist_in;
 map{ die " ERROR: $_ not found!\n" unless -e $_ } ($qlist_in, $slist_in);
-
-# check for existence of bowtie2 & samtools #
-check_exists("bowtie2");
-check_exists("samtools");
 
 ### MAIN
 # loading list #
@@ -54,15 +52,8 @@ add_dir($sdir, $slist_r) if $sdir;
 my $pmb = new Parallel::ForkManager($fork);
 foreach my $fig (keys %$slist_r){
 	my $pid = $pmb->start and next;
-	
-	# indexing subject fasta file (for seq retrieval by FORAGer) #
-	my $cmd = "samtools faidx $slist_r->{$fig}{'ref'}";
-	print STDERR $cmd, "\n" unless $verbose;
-	`$cmd`;
-
 	die " ERROR: $slist_r->{$fig}{'ref'} not found!\n" unless -e $slist_r->{$fig}{"ref"};
 	call_bowtie2_build($slist_r->{$fig}{"ref"});
-	
 	$pmb->finish;
 	}
 $pmb->wait_all_children;
@@ -79,12 +70,12 @@ foreach my $org (keys %$qlist_r){			# each set of read files
 		my $pid = $pm->start and next;
 	
 		# bowtie2 mapping #
-		my $bam_out = call_bowtie2_make_bam($org, $slist_r->{$fig}{"ref"}, 
+		my $sam_out = call_bowtie2($org, $slist_r->{$fig}{"ref"}, 
 								$qlist_r, $bowtie_params, $extra_params,
 								$outdir);
 		
 		# writing out 
-		print join("\t", $bam_out, $slist_r->{$fig}{"ref"}, $fig, $org), "\n";		# bam, subject_fasta, subject_FIG, query_org 
+		print join("\t", $sam_out, $fig, $org), "\n";
 						
 		# end fork #
 		$pm->finish;
@@ -94,16 +85,8 @@ $pm->wait_all_children;
 
 
 ### Subroutines
-sub check_exists{
-# check to see if program exists #
-	my $prog = shift;
-	my $ret = `which $prog`;
-	die " ERROR: cannot find \"$prog\"! Is it in your PATH?\n"
-		unless $ret; 
-	}
-
 sub make_outdir{
-	my $outdir = File::Spec->rel2abs("./bam/");
+	my $outdir = File::Spec->rel2abs("./sam/");
 	rmtree($outdir) if -d $outdir;
 	mkdir $outdir or die $!;
 	
@@ -111,30 +94,22 @@ sub make_outdir{
 	return $outdir;
 	}
 
-sub call_bowtie2_make_bam{
+sub call_bowtie2{
 	my ($org, $subject, $qlist_r, $bowtie_params, $extra_params, $outdir) = @_;
 	
 	my @sparts = File::Spec->splitpath($subject);
 	
 	my $cmd;
 	if(exists $qlist_r->{$org}{"F"} && exists $qlist_r->{$org}{"R"}){	# 2 read files
-		$cmd = "bowtie2 -x $subject -1 $qlist_r->{$org}{'F'} -2 $qlist_r->{$org}{'R'} $bowtie_params $extra_params"; 
+		$cmd = "bowtie2 -x $subject -S $outdir/$org-$sparts[2].sam -1 $qlist_r->{$org}{'F'} -2 $qlist_r->{$org}{'R'} $bowtie_params $extra_params"; 
 		}
 	elsif(exists $qlist_r->{$org}{"FR"}){
-		$cmd = "bowtie2 -x $subject -U $qlist_r->{$org}{'FR'} $bowtie_params $extra_params"; 
+		$cmd = "bowtie2 -x $subject -S $outdir/$org-$sparts[2].sam -U $qlist_r->{$org}{'FR'} $bowtie_params $extra_params"; 
 		}
-		
-	# calling samtools for sam->bam #
-	$cmd = join("", "bash -c \"samtools view -bS <\(", $cmd, "\) | samtools sort - $outdir/$org-$sparts[2].sort \"");
 	print STDERR $cmd, "\n" unless $verbose;
 	`$cmd`;
 	
-	# indexing bam file #
-	$cmd = "samtools index $outdir/$org-$sparts[2].sort.bam";
-	print STDERR $cmd, "\n" unless $verbose;
-	`$cmd`;
-	
-	return "$outdir/$org-$sparts[2].sort.bam";
+	return "$outdir/$org-$sparts[2].sam";
 	}
 
 sub call_bowtie2_build{
@@ -214,7 +189,7 @@ FORAGer_mapper.pl -- Mapping reads from query genomes to all reference genomes
 
 =head1 SYNOPSIS
 
-FORAGer_mapper.pl [flags] [query_directory] [subject_directory] > bam_index.txt
+FORAGer_mapper.pl [flags] [query_directory] [subject_directory] > sam_index.txt
 
 =head2 Required flags
 
@@ -283,23 +258,13 @@ perldoc FORAGer_mapper.pl
 Just a wrapper for bowtie2 to facilitate mapping of the query reads
 to all of the subject (reference) genomes.
 
-Output BAM file naming: 'query'-'subject'.sorted.bam
+Output SAM file naming: 'query'-'subject'.sam
 
 By default, the top 10 hits for each read are kept (bowtie2 param: '-k 10'). 
 
-=head2 'bam_index.txt'
+=head2 'sam_index.txt'
 
-3 columns: bam_file, subject_FIG_ID, query_organism_name
-
-=head1 REQUIRES
-
-=over
-
-=item * bowtie2 (>= 2.0.0-beta7)
-
-=item * samtools (>= v0.1.10)
-
-=back
+3 columns: sam_file, subject_FIG_ID, query_organism_name
 
 =head1 EXAMPLES
 
@@ -307,7 +272,7 @@ By default, the top 10 hits for each read are kept (bowtie2 param: '-k 10').
 
 FORAGer_mapper.pl -q ./query/ -s ./subject/ -list query_list.txt
 
-=head2 Forking (-f) & multiple bowtie2 threads (-p)
+=head2 Forking & multiple bowtie2 threads
 
 FORAGer_mapper.pl -q ./query/ -s ./subject/ -list query_list.txt -f 5 -p "-k 10 -p 4"
 
