@@ -43,11 +43,13 @@ my $index_r = load_index($index_in);
 
 # loading gene info #
 my $gene_start_stop_r = load_gene_info($index_r, $index_setup);
-	
 
-# foreach query #
+# foreach subject: write out gene sequences #
+print Dumper $gene_start_stop_r; exit;
+
+# foreach query: get mapped reads #
 my $pm = new Parallel::ForkManager($fork);
-foreach my $query_reads (keys %$index_r){		# each query genome
+foreach my $query_reads (keys %$index_r){			
 	print STDERR "### Processing indexed BAM files with reads from: $query_reads ###\n"
 		unless $query_reads eq "SINGLE_QUERY";
 
@@ -71,6 +73,8 @@ foreach my $query_reads (keys %$index_r){		# each query genome
 		# finding mapped reads #
 		reads_mapped_to_region($bam_file, $index_r->{$query_reads}{$bam_file}, 
 			$gene_start_stop_r, $gene_extend, \%reads_mapped, \%mapped_summary);	
+	
+		# finding 
 	
 		# saving data structures #
 		my @parts = File::Spec->splitpath($bam_file);
@@ -436,8 +440,8 @@ sub load_gene_info{
 		# setting indexing #
 		my ($FIG, $contig, $start, $end, $strand, $cluster);
 		if($index_setup){		# 'minimal'
-			$FIG = $line[0];
-			$contig = $line[1];
+			$FIG = $line[0];			# gene FIG_ID
+			$contig = $line[1];			# contig of Subject
 			$start = $line[2];
 			$end = $line[3];
 			$strand = $line[4];
@@ -484,135 +488,7 @@ sub load_gene_info{
 
 		print Dumper %gene_start_stop; exit;
 	return \%gene_start_stop;		# fig=>cluster=>contig=>start/stop=>value	
-	}
-
-sub load_gene_info_other{
-# getting geneIDs for a cluster; indexing as follows: #
-## taxon_ID			(same as index)
-## subject_contig_ID
-## subject_gene_start
-## subject_gene_end
-## subject_gene_strand
-## subject_gene_cluster
-
-	my ($index_r) = @_;
-
-	# parsing ITEP output #
-	my %gene_start_stop;
-	while(<>){
-		chomp;
-		next if /^\s*$/;
-		
-		# parsing #
-		my @line = split /\t/;
-		die " ERROR: row in gene info table must have 6 columns!\n"
-			unless scalar @line >= 6;
-		die " ERROR: clustID column should be integers in the last row of the ClusterGeneInformation table\n"
-			unless $line[$#line] =~ /^\d+$/;
-
-		## loading start-stop ##
-		(my $fig = $line[0]) =~ s/fig\||\.peg.+//g;			# FIG number
-		my $contig = $line[1];
-		my $start = $line[2];
-		my $end = $line[3];
-		my $strand = $line[4];
-		my $cluster = $line[5];
-		
-		$gene_start_stop{$fig}{$cluster}{$contig}{"start"} = $start;	# fig->clust->contig->cat->value
-		$gene_start_stop{$fig}{$cluster}{$contig}{"end"} = $end;		# fig->clust->contig->cat->value
-		$gene_start_stop{$fig}{$cluster}{$contig}{"strand"} = $strand;
-		}
-	
-	# sanity check #
-	die " ERROR: no gene information found for gene clusters!\n" if
-		scalar keys %gene_start_stop == 0;
-	
-	# counting clusters (in provided FIGs) #
-	## getting all figs ##
-	my @figs;
-	foreach my $q (keys %$index_r){
-		foreach my $bam (keys %{$index_r->{$q}}){
-			next if $bam eq "__SUBJECT_FASTA__";
-			push(@figs, $index_r->{$q}{$bam});
-			}
-		}
-	
-	## counting clusters ##
-	my %cnt;
-	foreach my $fig (@figs){
-		print STDERR " WARNING: FIG $fig not found in provided gene cluster info!\n"
-			unless exists $gene_start_stop{$fig} || $warnings_bool; 
-		map{ $cnt{$_}=1 } keys %{$gene_start_stop{$fig}};
-		}
-	print STDERR "Number of clusters containing genes from provided FIGs: ", scalar keys %cnt, "\n"; exit
-	
-		#print Dumper %gene_start_stop; exit;
-	return \%gene_start_stop;		# fig=>cluster=>contig=>start/stop=>value
-	}
-
-sub load_gene_info_ITEP{
-# getting geneIDs for a cluster from ITEP #
-	my ($index_r, $write_seqs_bool) = @_;
-
-	# parsing ITEP output #
-	my %gene_start_stop;
-	my (%fna, %faa);		# fasta ouput of clusters (nuc & aa)
-	while(<>){
-		chomp;
-		next if /^\s*$/;
-		
-		# parsing #
-		my @line = split /\t/;
-
-		die " ERROR: clustID column should be integers in the last row of the ClusterGeneInformation table\n"
-			unless $line[$#line] =~ /^\d+$/;
-
-		## loading start-stop ##
-		### FIG
-		(my $fig = $line[0]) =~ s/fig\||\.peg.+//g;
-		### contig_ID
-		$line[4] =~ s/^$line[2]\.//;
-		### strand
-		$gene_start_stop{$fig}{$#line}{$line[4]}{"start"} = $line[5];	# fig->clust->contig->cat->value
-			$gene_start_stop{$fig}{$#line}{$line[4]}{"stop"} = $line[6];	
-		$gene_start_stop{$fig}{$#line}{$line[4]}{"strand"} = $line[7];
-		
-		## loading sequences ##
-		$fna{$#line}{$line[0]} = $line[10]; # cluster=>fig=>nuc_seq
-		$faa{$#line}{$line[0]} = $line[11];
-		}
-	
-	# sanity check #
-	die " ERROR: no gene information found for gene clusters!\n" if
-		scalar keys %gene_start_stop == 0;
-	
-	# writing out fasta files #
-	unless($write_seqs_bool){
-		write_cluster_fasta(\%fna, "nuc");
-		write_cluster_fasta(\%faa, "aa");
-		print STDERR "\n" unless $verbose;
-		}
-	
-	# counting clusters (in provided FIGs) #
-	## getting all figs ##
-	my @figs;
-	foreach my $q (keys %$index_r){
-		foreach my $sam (keys %{$index_r->{$q}}){
-			push(@figs, $index_r->{$q}{$sam});
-			}
-		}
-	
-	## counting clusters ##
-	my %cnt;
-	foreach my $fig (@figs){
-		print STDERR " WARNING: FIG $fig not found in provided gene cluster info!\n"
-			unless exists $gene_start_stop{$fig} || $warnings_bool; 
-		map{ $cnt{$_}=1 } keys %{$gene_start_stop{$fig}};
-		}
-	print STDERR "Number of clusters containing genes from provided FIGs: ", scalar keys %cnt, "\n"; exit
-	
-		#print Dumper %gene_start_stop; exit;
-	return \%gene_start_stop;		# fig=>cluster=>contig=>start/stop=>value
+									# FIG = gene figID
 	}
 
 sub write_cluster_fasta{
