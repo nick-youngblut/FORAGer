@@ -80,9 +80,16 @@ foreach my $contig_dir (@contig_dirs){
 		
 		# if no contig file; filter table gets 'NA' #
 		if($files_r->{$clust_file} eq "NA"){		
-			write_filter_table($clust_file, 0, $contig_dir, $filter_fh);
+			write_filter_table($clust_file, 0, $contig_dir, $filter_fh, "NO_CONTIG_FILE",);
 			$pm->finish;
 			next;
+			}
+		
+		# if no contigs in contig file; filter table gets 'NA' #
+		unless( check_for_reads($contig_dir, $files_r->{$clust_file}) ){
+			write_filter_table($clust_file, 0, $contig_dir, $filter_fh,"NO_READS_IN_CONTIG_FILE");
+			$pm->finish;
+			next;			
 			}
 		
 		# blasting #
@@ -139,6 +146,19 @@ $pm->wait_all_children;
 
 
 ### Subroutines
+sub check_for_reads{
+# checking for reads for blasting #
+	my ($clust_dir, $file) = @_;
+
+	my $nreads = 0;
+	open IN, "$clust_dir/$file" or die $!;
+	while(<IN>){ $nreads++ if /^>/; }
+	close IN;
+
+	if($nreads){ return 1; }
+	else{ return 0; }	
+	}
+
 sub write_PA_table{
 	my ($summary_r, $clust_file, $contigs_r, $runID, $query_name, $PA_fh) = @_;
 	
@@ -241,7 +261,7 @@ sub write_passed_contig_fasta{
 	
 sub write_filter_table{
 # writing out PA table to STDOUT #
-	my ($clust_file, $summary_r, $contig_dir, $filter_fh) = @_;
+	my ($clust_file, $summary_r, $contig_dir, $filter_fh, $message) = @_;
 	
 	my @stats = qw/PA N_tblastn_hits_cutoff N_tblastn_hits N_cluster_genes length_cutoff hit_length_range cluster_length_range norm_bit_score min_bit_score bit_score_cutoff/;
 	
@@ -256,8 +276,8 @@ sub write_filter_table{
 			$passed = 1 if $summary_r->{$contig}{"PA"};
 			}
 		}
-	else{			# no contig file, failed assembly
-		print $filter_fh join("\t", $contig_dir, $clust_file, "NO_CONTIG_FILE", ("NA") x scalar @stats), "\n";		 
+	else{			# no contig file or reads in contig file
+		print $filter_fh join("\t", $contig_dir, $clust_file, $message, 0, ("NA") x (scalar(@stats) -1) ), "\n";		 
 		}
 		
 	return $passed;
@@ -472,6 +492,9 @@ sub tblastn_cluster_contig{
 # tblastn of contig vs cluster; parsing results #
 	my ($clust_file, $contig_file, $clust_dir, $contig_dir) = @_;
 	
+		#print STDERR join(",", $clust_file, $contig_file, $clust_dir, $contig_dir), "\n";
+	
+	# blasting #
 	my $cmd = "tblastn -query $clust_dir/$clust_file -subject $contig_dir/$contig_file -soft_masking true -outfmt '6 qseqid sseqid sstart send evalue bitscore sframe'";
 	
 	print STDERR $cmd, "\n" unless $verbose;
@@ -605,9 +628,13 @@ Normalized bit score cutoff (negative value to skip filtering). [0.4]
 Length range cutoff (min-max range of genes in the gene cluster * '-length'). 
 '-length 0' skips filtering. [0]
 
-=item -minimum
+=item -min_range
 
 The minimum length range for filtering (bp). [300]
+
+=item -min_length
+
+The minimum length of a contig to pass (bp). [60]
 
 =item -fork
 
