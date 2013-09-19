@@ -44,9 +44,6 @@ my $index_r = load_index($index_in);
 # loading gene info #
 my $gene_start_stop_r = load_gene_info($index_r, $index_setup);
 
-# foreach subject: write out gene sequences #
-print Dumper $gene_start_stop_r; exit;
-
 # foreach query: get mapped reads #
 my $pm = new Parallel::ForkManager($fork);
 foreach my $query_reads (keys %$index_r){			
@@ -62,19 +59,18 @@ foreach my $query_reads (keys %$index_r){
 		my (%reads_mapped, %mapped_summary);
 	
 		# forking #
-		my $pid = $pm->start and next;
+		$pm->start and next;
 	
 		# checking for presence of genes in fig #
 		unless (exists $gene_start_stop_r->{$index_r->{$query_reads}{$bam_file}}){
 			print STDERR " WARNING: none of the genes of interest are in FIG->", $index_r->{$query_reads}{$bam_file}, ", skipping\n";
+			$pm->finish;
 			next;
 			}
 	
 		# finding mapped reads #
 		reads_mapped_to_region($bam_file, $index_r->{$query_reads}{$bam_file}, 
 			$gene_start_stop_r, $gene_extend, \%reads_mapped, \%mapped_summary);	
-	
-		# finding 
 	
 		# saving data structures #
 		my @parts = File::Spec->splitpath($bam_file);
@@ -106,12 +102,12 @@ sub write_summary_table{
 	open OUT, ">$outdir_name/mapped_summary.txt" or die $!;
 	
 	# header #
-	print OUT join("\t", qw/Cluster FIG N_reads Gene_length Reads_by_length/), "\n";
+	print OUT join("\t", qw/Cluster FIG N_reads Gene_length_nuc Mean_coverage/), "\n";
 	
 	# body #
 	foreach my $cluster (keys %$mapped_summary_r){
 		foreach my $fig (keys %{$mapped_summary_r->{$cluster}}){
-			# count / length #
+			# N-reads / gene_length # (coverage)
 			my $frac;
 			if($mapped_summary_r->{$cluster}{$fig}{"length"}){
 				$frac = $mapped_summary_r->{$cluster}{$fig}{"count"} /
@@ -120,9 +116,9 @@ sub write_summary_table{
 			else{ $frac = 0; }
 			# writing line #
 			print OUT join("\t", $cluster, $fig, 
-				$mapped_summary_r->{$cluster}{$fig}{"count"},
-				$mapped_summary_r->{$cluster}{$fig}{"length"},
-				$frac), "\n"; 
+				$mapped_summary_r->{$cluster}{$fig}{"count"},			# number of reads mapped
+				$mapped_summary_r->{$cluster}{$fig}{"length"},			# length of gene
+				sprintf("%.3f", $frac) ), "\n"; 											# reads/length
 			}
 		}
 	
@@ -146,8 +142,8 @@ sub write_reads_mapped{
 		
 		foreach my $read (keys %{$reads_mapped_r->{$cluster}}){
 			# paired-end reads #
-			if(exists $reads_mapped_r->{$cluster}{$read}{1} && 
-				exists $reads_mapped_r->{$cluster}{$read}{2}){ 
+			if(exists $reads_mapped_r->{$cluster}{$read}{0} && 
+				exists $reads_mapped_r->{$cluster}{$read}{1}){ 
 				foreach my $pair (sort keys %{$reads_mapped_r->{$cluster}{$read}}){
 					foreach my $mapID (keys %{$reads_mapped_r->{$cluster}{$read}{$pair}}){
 						print OUTP join("\n", ">$read $pair:", $reads_mapped_r->{$cluster}{$read}{$pair}{$mapID}), "\n";
@@ -265,33 +261,43 @@ sub reads_mapped_to_region{
 			($gene_start, $gene_end) = flip_se($gene_start, $gene_end)
 				if $gene_start_stop_r->{$fig}{$cluster}{$contig}{"strand"} eq "-";
 			
-			# fetching alignments for query #
+			# fetching alignments (mapped reads) for query gene #
 			my @alignments = $bamo->get_features_by_location(-seq_id => $contig,
+																-type => 'read_pair',
 																-start => $gene_start,
 																-end => $gene_end);
-																#-type => 'read_pair');
-			unless(@alignments){
+			if(@alignments){
+				$mapped_summary_r->{$cluster}{$fig}{"count"} += scalar @alignments;
+				$mapped_summary_r->{$cluster}{$fig}{"length"} = abs($gene_end - $gene_start);				
+				}
+			else{
 				print STDERR "WARNING: no reads mapped to FIG:$fig -> Contig:$contig -> cluster:$cluster\n"
 					unless $warnings_bool;
-				$mapped_summary_r->{$cluster}{$fig}{"count"} += scalar @alignments;
-				$mapped_summary_r->{$cluster}{$fig}{"length"} = 0;
+				
+				$mapped_summary_r->{$cluster}{$fig}{"count"} += 0;
+				$mapped_summary_r->{$cluster}{$fig}{"length"} = abs($gene_end - $gene_start);				
 				next;
 				}
 
 			# loading read names #
 			foreach my $aln (@alignments){		# read IDs
 				# cluster->read_ID->pair->mapID = read
-				print Dumper $aln;
+				my (@pairs) = $aln->get_SeqFeatures;
+				for my $i (0..$#pairs){
+					$reads_mapped_r->{$cluster}{$pairs[$i]->name}{$i}{"$fig\__$contig"} = $pairs[$i]->seq->seq;
+					}
+				
+				#print Dumper $aln->seq;
 				#print Dumper $aln->query->seq_id;
 				#print Dumper $aln->query->dna;
 				#print Dumper $aln->get_tag_values('PAIRED');
 				#print Dumper $aln;
 				#$reads_mapped_r->{$cluster}{$$id[0]}{$$id[1]}{"$fig\__$$id[2]"} = $$id[3];
+			#	$reads_mapped_r->{$cluster}{$aln->name}{  }{  } = $aln->seq->seq;
 				}			
-			
 			}
 		}	
-	exit;	
+	
 		#print Dumper %$reads_mapped_r; exit;
 		#print Dumper %$mapped_summary_r; exit;
 	sub flip_se{
@@ -426,6 +432,7 @@ sub load_gene_info{
 
 	# parsing gene info table from STDIN #
 	my %gene_start_stop;
+	my (%fna, %faa);		# fasta ouput of clusters (nuc & aa)
 	while(<>){	
 		chomp;
 		next if /^\s*$/;
@@ -461,11 +468,21 @@ sub load_gene_info{
 		$gene_start_stop{$FIG}{$cluster}{$contig}{"end"} = $end;
 		$gene_start_stop{$FIG}{$cluster}{$contig}{"strand"} = $strand;
 
+		## loading sequences ##
+		$fna{$line[13]}{$line[0]} = $line[10];
+		$faa{$line[13]}{$line[0]} = $line[11];
 	}
+	
 	# sanity check #
 	die " ERROR: no gene information found for gene clusters!\n" if
 		scalar keys %gene_start_stop == 0;		
-	
+
+	# writing out fasta files #
+	unless($write_seqs_bool){
+		write_cluster_fasta(\%fna, "nuc");
+		write_cluster_fasta(\%faa, "aa");
+		print STDERR "\n" unless $verbose;
+		}	
 		
 	# counting clusters (in provided FIGs) #
 	## getting all figs ##
@@ -476,7 +493,7 @@ sub load_gene_info{
 			push(@figs, $index_r->{$q}{$bam});
 			}
 		}
-	
+
 	## counting clusters ##
 	my %cnt;
 	foreach my $fig (@figs){
@@ -486,7 +503,7 @@ sub load_gene_info{
 		}
 	print STDERR "Number of clusters containing genes from provided FIGs: ", scalar keys %cnt, "\n";
 
-		print Dumper %gene_start_stop; exit;
+		#print Dumper %gene_start_stop; exit;
 	return \%gene_start_stop;		# fig=>cluster=>contig=>start/stop=>value	
 									# FIG = gene figID
 	}
@@ -567,7 +584,12 @@ Number of base pairs to extend around the gene of interest (5' & 3'). [100]
 
 =item -fork
 
-Number of SAM files to process in parallel. [1]
+Number of BAM files to process in parallel. [1]
+
+=item -ITEP
+
+Piped input indexed as ITEP db_getClusterGeneInformation.py? [TRUE]
+
 
 =item -verbose
 
@@ -590,14 +612,15 @@ perldoc FORAGer.pl
 =head1 DESCRIPTION
 
 Pull out all reads mapping to each gene (& region around the gene)
-in each gene cluster. Multiple draft (query reads) and (almost)-closed
-genomes (reference genomes) can be used.
+in each gene cluster. Query reads from multiple draft genomes
+can be mapped onto multple and draft/closed
+reference genomes (just need to make an index file).
 
 =head2 Input
 
 =head3 Index file
 
-2 or 3 column tab-delimited file for associating a SAM file to 
+2 or 3 column tab-delimited file for associating a BAM file to 
 the FIG ID of the reference genome used for mapping. 'Query' (3rd column)
 is only needed if multiple query draft genomes were used for read
 mapping.
@@ -612,12 +635,12 @@ Clusters should be from 1 cluster run!
 
 output from 
 
-=head3 SAM files
+=head3 BAM files
 
 Reads from a genome of interest (e.g. a draft genome) should be mapped
-onto all other genomes (producing the SAM files required).
+onto all other genomes (producing the BAM files required).
 
-You do not need to provide a *sam file for each FIG in each gene cluster;
+You do not need to provide a *bam file for each FIG in each gene cluster;
 however, genes from any genomes lacking *sam files will be skipped (ie. 
 no reads pulled out for those genes; less total reads for the local assembly)
 
@@ -627,11 +650,19 @@ Multiple mappings are allowed for the same file (e.g. bowtie2 with '-k' flag).
 
 All files output to a directory(s). See '-outdir'.
 
+=head3 read files
+
 File prefix = 'clust#'
 
 '_FR.fna' = Just paired-end reads that both mapped to the gene region
 
 '_A.fna' = All reads that mapped to the gene region
+
+=head3 summary file
+
+"*summary.txt"
+
+Output: Cluster_ID, FIG_ID, Number_of_reads_mapped, Gene_length, Reads_by_length
 
 =head2 Requires
 
@@ -647,7 +678,7 @@ $ bowtie2 -x genome1 -S genome1.sam -1 reads_F.fq -2 reads_R.fq -k 10
 
 =head2 Make an index file
 
-column1 = *sam file location
+column1 = *bam file location
 
 column2 = FIG ID
 

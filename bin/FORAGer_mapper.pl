@@ -258,7 +258,7 @@ Parameters passed to bowtie2 (besides '-x, -S, -1, -2'). [-k 10]
 
 =item -extra
 
-Parameters appended to '-params'. []
+Parameters appended to '-params' (example: '-p 4' for 4 threads). []
 
 =item -forks
 
