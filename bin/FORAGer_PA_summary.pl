@@ -12,9 +12,10 @@ use List::Util qw/sum/;
 ### args/flags
 pod2usage("$0: No files given.") if ((@ARGV == 0) && (-t STDIN));
 
-my ($verbose, $taxa_in);
+my ($verbose, $query_in, $subject_in);
 GetOptions(
-	   "taxa=s" => \$taxa_in,
+	   "query=s" => \$query_in,
+	   "subject=s" => \$subject_in,
 	   "verbose" => \$verbose,
 	   "help|?" => \&pod2usage # Help
 	   );
@@ -23,61 +24,103 @@ GetOptions(
 
 ### MAIN
 # loading taxa of interest #
-my $taxa_r = load_taxa_list($taxa_in) if $taxa_in;
+my $taxa_r = load_taxa_list($query_in) if $query_in;
+my $subject_r = load_taxa_list($subject_in) if $subject_in;
 
 # parsing PA tables #
-my ($PA_ITEP_r, $toi_ITEP_r) = parse_PA($ARGV[0], $taxa_r);
-my ($PA_user_r, $toi_user_r) = parse_PA($ARGV[1], $taxa_r);
+my ($PA_ITEP_r, $toi_ITEP_r) = parse_PA($ARGV[0], $subject_r);
+my ($PA_user_r, $toi_user_r) = parse_PA($ARGV[1], $subject_r);
 
 # core/variable; multi-copy #
 ## determining core/variable & copy ##
-my $core_var_ITEP_r = core_var_copy_PA($PA_ITEP_r, $toi_ITEP_r);
-my $core_var_user_r = core_var_copy_PA($PA_user_r, $toi_user_r);
+my $core_var_ITEP_r = core_var_copy_PA($PA_ITEP_r, $toi_ITEP_r, $subject_r);
+my $core_var_user_r = core_var_copy_PA($PA_user_r, $toi_user_r, $subject_r);
+
+# sanity check #
+die " ERROR: no taxon names in ITEP PA table matched taxa_list!\n" unless %$core_var_ITEP_r;
+die " ERROR: no taxon names in user PA table matched taxa_list!\n" unless %$core_var_user_r;
 
 ## writing summary ##
 write_core_var_summary($core_var_ITEP_r, "ITEP");
 write_core_var_summary($core_var_user_r, "user");
+
+## trim to just query taxa ##
+trim_to_query($PA_ITEP_r, $taxa_r);
+trim_to_query($PA_user_r, $taxa_r); 
+
 ## determining conflicts in core/variable ##
-core_var_conflicts($core_var_ITEP_r, $core_var_user_r);
+core_var_conflicts($PA_ITEP_r, $PA_user_r, $core_var_ITEP_r, $core_var_user_r);
 
 
 ### subroutines
+sub trim_to_query{
+	my ($PA_r, $taxa_r) = @_;
+
+	foreach my $cluster (keys %$PA_r){
+		foreach my $taxon (keys %{$PA_r->{$cluster}}){
+			delete $PA_r->{$cluster}{$taxon} unless exists $taxa_r->{$taxon};
+			unless( %{$PA_r->{$cluster}} ){
+				delete $PA_r->{$cluster};
+				last;
+				}
+			}
+		}
+	}
+
 sub core_var_conflicts{
 # determining conflicts in core/var & copy #
-	my ($core_var_ITEP_r, $core_var_user_r) = @_;
-	
-	my %conflicts;
-	foreach my $cluster (keys %$core_var_ITEP_r){
-		if(exists $core_var_user_r->{$cluster}){		# intersection
-			my $status;
-			if($core_var_ITEP_r->{$cluster}{'core_var'} ne
-				$core_var_user_r->{$cluster}{'core_var'} ||
-				$core_var_ITEP_r->{$cluster}{'copy'} ne
-				$core_var_user_r->{$cluster}{'copy'} ){
-				$status = "Conflict:"
-				}
-			else{ $status = "Consistent:" }	
-			
-			print join("\t", $status, $cluster, 
-				"Present", "Present", 
-				$core_var_ITEP_r->{$cluster}{'core_var'}, 
-				$core_var_ITEP_r->{$cluster}{'copy'},
-				$core_var_user_r->{$cluster}{'core_var'}, 
-				$core_var_user_r->{$cluster}{'copy'} ), "\n";	
-			}
-		else{									# ITEP-specific
-			print join("\t", "Conflict:", $cluster, "Present", "Absent",
+	my ($PA_ITEP_r, $PA_user_r, $core_var_ITEP_r, $core_var_user_r) = @_;
+
+		#print Dumper $core_var_ITEP_r; exit;
+
+	foreach my $cluster (keys %$PA_ITEP_r){
+		unless( exists $PA_user_r->{$cluster} ){			# present in ITEP; not in user
+			print join("\t", "Conflict:", $cluster, "Present", "Absent", "complete",
 					$core_var_ITEP_r->{$cluster}{'core_var'}, 
-					$core_var_ITEP_r->{$cluster}{'copy'}, "NA", "NA"), "\n";
+					$core_var_ITEP_r->{$cluster}{'copy'}, "NA", "NA"), "\n";			
+			}
+		# present in both; checking for overlap of taxa #
+		else{			
+			# intersection of taxa names? # 
+			my (%union, %isect);
+			foreach my $e (keys %{$PA_ITEP_r->{$cluster}} , %{$PA_user_r->{$cluster}}){
+				$union{$e}++ && $isect{$e}++; 
+				}
+			if(scalar keys %isect == 0){			# same, but not the same taxa
+				print join("\t", "Cluster_overlap:", $cluster, "Present", "Present", "partial",
+					$core_var_ITEP_r->{$cluster}{'core_var'}, 
+					$core_var_ITEP_r->{$cluster}{'copy'},
+					$core_var_user_r->{$cluster}{'core_var'}, 
+					$core_var_user_r->{$cluster}{'copy'}), "\n";		
+				}
+			elsif(scalar keys %isect == scalar keys %{$PA_ITEP_r->{$cluster}} &&
+				scalar keys %isect == scalar keys %{$PA_user_r->{$cluster}}){		# both have all of the taxa
+				print join("\t", "Consistent:", $cluster, "Present", "Present", "complete",
+					$core_var_ITEP_r->{$cluster}{'core_var'}, 
+					$core_var_ITEP_r->{$cluster}{'copy'},
+					$core_var_user_r->{$cluster}{'core_var'}, 
+					$core_var_user_r->{$cluster}{'copy'}), "\n";					
+				}
+			else{
+				print join("\t", "Taxa_overlap:", $cluster, "Present", "Present", "partial",
+					$core_var_ITEP_r->{$cluster}{'core_var'}, 
+					$core_var_ITEP_r->{$cluster}{'copy'},
+					$core_var_user_r->{$cluster}{'core_var'}, 
+					$core_var_user_r->{$cluster}{'copy'}), "\n";				
+				}
 			}
 		}
-	foreach my $cluster (keys %$core_var_user_r){			# user-specific
-		unless(exists $core_var_ITEP_r->{$cluster}){
-			print join("\t", "Conflict:", $cluster, "Absent", "Present", "NA", "NA",
-						$core_var_user_r->{$cluster}{'core_var'}, 
-						$core_var_user_r->{$cluster}{'copy'} ), "\n";
+	# present in user, but not ITEP?
+	foreach my $cluster (keys %$PA_user_r){					
+		unless( exists $PA_ITEP_r->{$cluster} ){
+			print join("\t", "Conflict:", $cluster, "Absent", "Present", "complete",
+					"NA", "NA",
+					$core_var_user_r->{$cluster}{'core_var'}, 
+					$core_var_user_r->{$cluster}{'copy'}), "\n";	
+			
 			}
 		}
+
 	}
 
 sub write_core_var_summary{
@@ -102,8 +145,7 @@ sub write_core_var_summary{
 
 sub core_var_copy_PA{
 # determining which clusters are core, variable, and multi-copy #
-	my ($PA_r, $toi_r) = @_;
-	
+	my ($PA_r, $toi_r, $taxa_r) = @_;
 		#print Dumper $PA_r; exit;
 	
 	my %core_var;
@@ -187,7 +229,7 @@ sub parse_PA{
 		@toi = keys %$taxa_r;
 		}
 	else{ @toi = @header[3..$#header]; }
-	
+		
 		#print Dumper %PA; exit;
 	return \%PA, \@toi;
 	}
@@ -201,12 +243,13 @@ sub load_taxa_list{
 	while(<IN>){
 		chomp;
 		next if /^\s*$/;
+		my @line = split /\t/;
 		
-		$taxa{$_} = 1;
+		$taxa{$line[0]} = 1;
 		}
 	close IN;
 
-		#print Dumper @taxa; exit;
+		#print Dumper %taxa; exit;
 	return \%taxa;
 	}
 
@@ -226,9 +269,13 @@ FORAGer_PA_summary.pl [options] ITEP_PA.txt FORAGer_PA.txt > summary.txt
 
 =over
 
-=item -taxa
+=item -query
 
-A file with a list of taxon names to examine in the pres-abs tables.
+A file with a list of taxon names that determine how pres-abs is called.
+
+=item -subject
+
+A file with a list of taxon names that determine how core-variable is called.
 
 =item -v	Verbose output
 
@@ -254,11 +301,35 @@ ITEP table: db_getPresenceAbsenceTable.py -r mazei_I_2.0_c_0.4_m_maxbit -i
 
 FORAGer table: db_getPresenceAbsenceTable.py -r mazei_I_2.0_c_0.4_m_maxbit -u
 
+=head2 Output
+
+=over
+
+=item Conflict or consistent pres/abs between tables (also overlap of genes or just cluster_ID)?
+
+=item Gene cluster ID
+
+=item Present in ITEP table?
+
+=item Present in user_genes table?
+
+=item All genes shared in the cluster (complete|partial)?
+
+=item ITEP: Core (in all genomes) or variable (only some genomes) gene?
+
+=itme ITEP: Single copy or multi-copy gene?
+
+=item User: Core (in all genomes) or variable (only some genomes) gene?
+
+=itme User: Single copy or multi-copy gene?
+
+=back
+
 =head1 EXAMPLES
 
-=head2 Usage method 1
+=head2 Basic usage:
 
-FORAGer_PA_summary.pl <(db_getPresenceAbsenceTable.py -r mazei_I_2.0_c_0.4_m_maxbit -i ) <(db_getPresenceAbsenceTable.py -r mazei_I_2.0_c_0.4_m_maxbit -u) -t taxa_list.txt > summary.txt
+FORAGer_PA_summary.pl <(db_getPresenceAbsenceTable.py -r mazei_I_2.0_c_0.4_m_maxbit -i ) <(db_getPresenceAbsenceTable.py -r mazei_I_2.0_c_0.4_m_maxbit -u) -q taxa_list.txt -s taxa_list.txt > summary.txt
 
 =head1 AUTHOR
 

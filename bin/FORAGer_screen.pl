@@ -16,7 +16,7 @@ pod2usage("$0: No files given.") if ((@ARGV == 0) && (-t STDIN));
 
 my ($verbose, $nuc_clust_dir, $aa_clust_dir, @contig_dirs, $write_cluster, $header_bool);
 my $fork = 0;
-my $len_cutoff = 3;				# range expansion factor [3x]
+my $len_cutoff = 0;				# range expansion factor [range * -len_cutoff]; off by default
 my $floor = 300;				# min range (bp)
 my $bit_cutoff = 0.4;			# homology cutoff
 my $truncate = 0;				# truncating contig lengths to max tblastn range
@@ -591,7 +591,7 @@ Normalized bit score cutoff (negative value to skip filtering). [0.4]
 =item -length
 
 Length range cutoff (min-max range of genes in the gene cluster * '-length'). 
-'-length 0' skips filtering. [3]
+'-length 0' skips filtering. [0]
 
 =item -minimum
 

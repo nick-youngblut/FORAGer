@@ -136,26 +136,30 @@ db_filterGeneInfoTable.pl [options] < geneinfo.txt > geneinfo_edit.txt
 
 =over
 
-=item -length
+=item -length  <int>
 
 Minimum length cutoff (bp) of all pegs in a cluster. [0]
 
-=item -count
+=item -count  <int>
 
 Minimum number of pegs in a cluster. [1]
 
--item -multi
+-item -multi  <int>
 
 Minimum number of gene copies in >= 1 genome (for selecting multi-copy gene clusters). [1]
 
-=item -annotation
+=item -annotation  <char>
 
 Filter out any clusters where all pegs have provided annotations. 
-Comma delimited list. ['DEFAULT' = "conserved protein, hypothetical"]
+(comma delimited list; 'DEFAULT' = "conserved protein, hypothetical"). [ ]
 
-=item -v	Verbose output
+=item -verbose  <bool>
 
-=item -h	This help message
+Verbose output
+
+=item -help  <bool>
+
+This help message
 
 =back
 
