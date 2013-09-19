@@ -102,23 +102,18 @@ sub write_summary_table{
 	open OUT, ">$outdir_name/mapped_summary.txt" or die $!;
 	
 	# header #
-	print OUT join("\t", qw/Cluster FIG N_reads Gene_length_nuc Mean_coverage/), "\n";
+	print OUT join("\t", qw/Cluster FIG N_reads Gene_length_nuc Mean_coverage Stdev_coverage/), "\n";
 	
 	# body #
 	foreach my $cluster (keys %$mapped_summary_r){
 		foreach my $fig (keys %{$mapped_summary_r->{$cluster}}){
-			# N-reads / gene_length # (coverage)
-			my $frac;
-			if($mapped_summary_r->{$cluster}{$fig}{"length"}){
-				$frac = $mapped_summary_r->{$cluster}{$fig}{"count"} /
-					$mapped_summary_r->{$cluster}{$fig}{"length"};
-				}
-			else{ $frac = 0; }
 			# writing line #
 			print OUT join("\t", $cluster, $fig, 
 				$mapped_summary_r->{$cluster}{$fig}{"count"},			# number of reads mapped
 				$mapped_summary_r->{$cluster}{$fig}{"length"},			# length of gene
-				sprintf("%.3f", $frac) ), "\n"; 											# reads/length
+				$mapped_summary_r->{$cluster}{$fig}{"coverage_mean"},		# mean coverage
+				$mapped_summary_r->{$cluster}{$fig}{"coverage_stdev"}		# stdev of coverage
+				), "\n"; 											# reads/length
 			}
 		}
 	
@@ -266,16 +261,33 @@ sub reads_mapped_to_region{
 																-type => 'read_pair',
 																-start => $gene_start,
 																-end => $gene_end);
+			
+			# fetching coverage of mapped reads for query gene #
+			my $cov = $bamo->get_features_by_location(-seq_id => $contig,
+																-type => 'coverage',
+																-start => $gene_start,
+																-end => $gene_end);
+			my @cov = $bamo->features(-type => 'coverage', -seq_id => $contig, -start => $gene_start, -end => $gene_end);
+			
+
+			# summarizing #
 			if(@alignments){
 				$mapped_summary_r->{$cluster}{$fig}{"count"} += scalar @alignments;
 				$mapped_summary_r->{$cluster}{$fig}{"length"} = abs($gene_end - $gene_start);				
+				
+				$mapped_summary_r->{$cluster}{$fig}{"coverage_mean"} = average([$cov[0]->coverage]);
+				$mapped_summary_r->{$cluster}{$fig}{"coverage_stdev"} = stdev([$cov[0]->coverage]);								
 				}
 			else{
 				print STDERR "WARNING: no reads mapped to FIG:$fig -> Contig:$contig -> cluster:$cluster\n"
 					unless $warnings_bool;
 				
 				$mapped_summary_r->{$cluster}{$fig}{"count"} += 0;
-				$mapped_summary_r->{$cluster}{$fig}{"length"} = abs($gene_end - $gene_start);				
+				$mapped_summary_r->{$cluster}{$fig}{"length"} = abs($gene_end - $gene_start);
+
+				$mapped_summary_r->{$cluster}{$fig}{"coverage_mean"} = 0;
+				$mapped_summary_r->{$cluster}{$fig}{"coverage_stdev"} = 0;
+				
 				next;
 				}
 
@@ -537,6 +549,32 @@ sub write_cluster_fasta{
 	print STDERR "...fasta for each cluster written to $outdir\n" unless $verbose;
 	}
 
+
+sub average{
+        my($data) = @_;
+        if (not @$data) {
+                die("Empty array\n");
+        }
+        my $total = 0;
+        foreach (@$data) {
+                $total += $_;
+        }
+        my $average = $total / @$data;
+        return $average;
+}
+sub stdev{
+        my($data) = @_;
+        if(@$data == 1){
+                return 0;
+        }
+        my $average = &average($data);
+        my $sqtotal = 0;
+        foreach(@$data) {
+                $sqtotal += ($average-$_) ** 2;
+        }
+        my $std = ($sqtotal / (@$data-1)) ** 0.5;
+        return $std;
+}
 
 
 __END__

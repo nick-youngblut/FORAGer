@@ -17,6 +17,7 @@ pod2usage("$0: No files given.") if ((@ARGV == 0) && (-t STDIN));
 my ($verbose, $nuc_clust_dir, $aa_clust_dir, @contig_dirs, $write_cluster, $header_bool);
 my $fork = 0;
 my $len_cutoff = 0;				# range expansion factor [range * -len_cutoff]; off by default
+my $min_length = 60; 			# min length of contig
 my $floor = 300;				# min range (bp)
 my $bit_cutoff = 0.4;			# homology cutoff
 my $truncate = 0;				# truncating contig lengths to max tblastn range
@@ -29,7 +30,8 @@ GetOptions(
 	   "contigs=s{,}" => \@contig_dirs,
 	   "length=f" => \$len_cutoff, 			# cutoff length for a contig (%)
 	   "bitscore=f" => \$bit_cutoff, 		# normalized bitscore cutoff
-	   "minimum=i" => \$floor,				# min range (bp)
+	   "min_range=i" => \$floor,			# min range (bp)
+	   "min_length=i" => \$min_length, 		# min length of contig (bp)
 	   "write" => \$write_cluster, 			# write cluster w/ contig
 	   "truncate=s" => \$truncate, 			# truncating 'passed' contigs to max cluster sequence length [TRUE]
 	   "x" => \$header_bool, 				# write header? [FALSE]
@@ -104,7 +106,7 @@ foreach my $contig_dir (@contig_dirs){
 		
 		## filtering by length cutoff ##	
 		my $clust_range_r = get_clust_len_range($clusters_r, $len_cutoff, $floor);
-		filter_by_length($clust_range_r, $contigs_r, $clusters_r, $tblastn_r, \%summary);	
+		filter_by_length($clust_range_r, $contigs_r, $clusters_r, $tblastn_r, $min_length, \%summary);	
 	
 		## filtering by score and length ##
 		filter_by_bitscore($contigs_r, $tblastn_r, $bit_cutoff, \%summary);
@@ -298,18 +300,28 @@ sub filter_by_bitscore{
 
 sub filter_by_length{
 # filtering the contigs by length relative to cluster #
-	my ($clust_range_r, $contigs_r, $clusters_r, $tblastn_r, $summary_r) = @_;
+	my ($clust_range_r, $contigs_r, $clusters_r, $tblastn_r, $min_length, $summary_r) = @_;
 
 	foreach my $contig (keys %$contigs_r){ 							# checking contig
-		if($len_cutoff && exists $tblastn_r->{$contig}){			# if tblastn hit(s)
+		if(($len_cutoff || $min_length) && exists $tblastn_r->{$contig}){			# if tblastn hit(s)
 			
 			# checking all tblastn hit lengths #
 			my $N_passed = 0;		# default = fail
 			my @hit_lens;
 			foreach my $query (keys %{$tblastn_r->{$contig}}){				# 1 hit per gene in cluster must meet length requirement
 				my $hit_len = abs(${$tblastn_r->{$contig}{$query}}[1] - ${$tblastn_r->{$contig}{$query}}[0]);		# length in nuc				
-				$N_passed++ if $hit_len >= $$clust_range_r[0] &&			# expanding negative range
-							   $hit_len <= $$clust_range_r[1];				# expanding positive range
+				if($len_cutoff && $min_length){
+					$N_passed++ if $hit_len >= $$clust_range_r[0] &&			# expanding negative range
+							   $hit_len <= $$clust_range_r[1] && 
+							   $hit_len >= $min_length;				# expanding positive range
+					}
+				elsif($len_cutoff){
+					$N_passed++ if $hit_len >= $$clust_range_r[0] &&			# expanding negative range
+							   $hit_len <= $$clust_range_r[1];					
+					}
+				elsif($min_length){
+					$N_passed++ if $hit_len >= $min_length;										
+					}
 				push(@hit_lens, $hit_len);
 				}
 				
