@@ -148,8 +148,8 @@ Minimum number of pegs in a cluster. [1]
 Minimum number of gene copies in >= 1 genome (for selecting multi-copy gene clusters). [1]
 .IP "\-annotation  <char>" 4
 .IX Item "-annotation  <char>"
-Filter out any clusters where all pegs have provided annotations. 
-(comma delimited list; '\s-1DEFAULT\s0' = \*(L"conserved protein, hypothetical\*(R"). [ ]
+Filter out any clusters where \s-1ALL\s0 pegs have provided annotations. 
+(comma delimited list; '\s-1DEFAULT\s0' = \*(L"conserved protein, hypothetical, predicted\*(R"). [ ]
 .IP "\-verbose  <bool>" 4
 .IX Item "-verbose  <bool>"
 Verbose output
@@ -163,11 +163,22 @@ perldoc db_filterGeneInfoTable.pl
 .IX Header "DESCRIPTION"
 Convience script for filtering out clusters in a gene info table
 produced by \s-1ITEP\s0.
+.PP
+A gene cluster will only be removed due to 'bad' annotations
+if all of the genes in the cluster have the same annotation.
+.PP
+Capitalization does not matter for filtering words. The annotation
+must just contain any of the words provided in at least part of
+the annotation.
 .SH "EXAMPLES"
 .IX Header "EXAMPLES"
 .SS "Usage: filtering by length (>= 300bp)"
 .IX Subsection "Usage: filtering by length (>= 300bp)"
 db_filterGeneInfoTable.pl \-l 300 < gene_info.txt > filtered_gene_info.txt
+.ie n .SS "Usage: filtering by anntotation ""hypothetical"""
+.el .SS "Usage: filtering by anntotation ``hypothetical''"
+.IX Subsection "Usage: filtering by anntotation hypothetical"
+db_filterGeneInfoTable.pl \-a hypothetical < gene_info.txt > filtered_gene_info.txt
 .SH "AUTHOR"
 .IX Header "AUTHOR"
 Nick Youngblut <nyoungb2@illinois.edu>

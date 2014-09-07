@@ -165,9 +165,12 @@ Normalized bit score cutoff (negative value to skip filtering). [0.4]
 .IX Item "-length"
 Length range cutoff (min-max range of genes in the gene cluster * '\-length'). 
 \&'\-length 0' skips filtering. [0]
-.IP "\-minimum" 4
-.IX Item "-minimum"
+.IP "\-min_range" 4
+.IX Item "-min_range"
 The minimum length range for filtering (bp). [300]
+.IP "\-min_length" 4
+.IX Item "-min_length"
+The minimum length of a contig to pass (bp). [60]
 .IP "\-fork" 4
 .IX Item "-fork"
 Number of parallel cluster comparisons to perform. [1]

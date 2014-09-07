@@ -28,8 +28,11 @@ GetOptions(
 
 ### I/O error & defaults
 my @annotation_filter = split / *, */, $annotation_filter if $annotation_filter;
-@annotation_filter = ("conserved protein", "hypothetical")
-	if $annotation_filter && $annotation_filter eq "DEFAULT";
+if ($annotation_filter && $annotation_filter eq "DEFAULT"){
+	@annotation_filter = ("conserved protein", "conserved domain protein", "hypothetical", "predicted protein");
+	print STDERR "...using DEFAULT filtering words:\n", join(",\n", @annotation_filter), "\n";
+	}
+	
 
 ### MAIN
 my $tbl_r = load_gene_info_tbl();
@@ -56,7 +59,7 @@ sub filter_by_annotation{
 		# checking for annotations #
 		foreach my $annot ( @{$tbl_r->{$cluster}{"annotation"}} ){
 			foreach my $filt (@$annot_r){
-				if( $annot =~ $filt ){
+				if( $annot =~ /$filt/i ){
 					$bad_annot_cnt++;
 					last;
 					}
@@ -150,8 +153,8 @@ Minimum number of gene copies in >= 1 genome (for selecting multi-copy gene clus
 
 =item -annotation  <char>
 
-Filter out any clusters where all pegs have provided annotations. 
-(comma delimited list; 'DEFAULT' = "conserved protein, hypothetical"). [ ]
+Filter out any clusters where ALL pegs have provided annotations. 
+(comma delimited list; 'DEFAULT' = "conserved protein, hypothetical, predicted"). [ ]
 
 =item -verbose  <bool>
 
@@ -172,11 +175,23 @@ perldoc db_filterGeneInfoTable.pl
 Convience script for filtering out clusters in a gene info table
 produced by ITEP.
 
+A gene cluster will only be removed due to 'bad' annotations
+if all of the genes in the cluster have the same annotation.
+
+Capitalization does not matter for filtering words. The annotation
+must just contain any of the words provided in at least part of
+the annotation.
+
 =head1 EXAMPLES
 
 =head2 Usage: filtering by length (>= 300bp)
 
 db_filterGeneInfoTable.pl -l 300 < gene_info.txt > filtered_gene_info.txt
+
+=head2 Usage: filtering by anntotation "hypothetical"
+
+db_filterGeneInfoTable.pl -a hypothetical < gene_info.txt > filtered_gene_info.txt
+
 
 =head1 AUTHOR
 

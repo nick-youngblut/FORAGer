@@ -63,7 +63,7 @@ foreach my $query_reads (keys %$index_r){
 	
 		# checking for presence of genes in fig #
 		unless (exists $gene_start_stop_r->{$index_r->{$query_reads}{$bam_file}}){
-			print STDERR " WARNING: none of the genes of interest are in FIG->", $index_r->{$query_reads}{$bam_file}, ", skipping\n";
+			print STDERR "!!! WARNING: none of the genes of interest are in FIG->", $index_r->{$query_reads}{$bam_file}, ", skipping\n";
 			$pm->finish;
 			next;
 			}
@@ -682,63 +682,4 @@ You do not need to provide a *bam file for each FIG in each gene cluster;
 however, genes from any genomes lacking *sam files will be skipped (ie. 
 no reads pulled out for those genes; less total reads for the local assembly)
 
-Multiple mappings are allowed for the same file (e.g. bowtie2 with '-k' flag).
-
-=head2 Output files
-
-All files output to a directory(s). See '-outdir'.
-
-=head3 read files
-
-File prefix = 'clust#'
-
-'_FR.fna' = Just paired-end reads that both mapped to the gene region
-
-'_A.fna' = All reads that mapped to the gene region
-
-=head3 summary file
-
-"*summary.txt"
-
-Output: Cluster_ID, FIG_ID, Number_of_reads_mapped, Gene_length, Reads_by_length
-
-=head2 Requires
-
-ITEP must be set up, so that it can be queried. 
-
-=head1 EXAMPLES
-
-=head2 Mapping reads to a reference genome
-
-$ bowtie2-build genome1.fna genome1
-
-$ bowtie2 -x genome1 -S genome1.sam -1 reads_F.fq -2 reads_R.fq -k 10
-
-=head2 Make an index file
-
-column1 = *bam file location
-
-column2 = FIG ID
-
-=head2 Get some gene clusters of interest
-
-$ db_getAllClusterRuns.py | grep "mazei_I_2.0_c_0.4_m_maxbit" | 
-db_getClustersWithAnnotation.py "methyl coenzyme M reductase" |
-db_getClusterGeneInformation.py | FORAGer.pl -in index.txt 
--runID all_I_2.0_c_0.4_m_maxbit
-
-=head1 AUTHOR
-
-Nick Youngblut <nyoungb2@illinois.edu>
-
-=head1 AVAILABILITY
-
-sharchaea.life.uiuc.edu:/home/git/ITEP_PopGen/
-
-=head1 COPYRIGHT
-
-Copyright 2010, 2011
-This software is licensed under the terms of the GPLv3
-
-=cut
-
+Multiple mappings are allowed for the same file (e.g. bowtie2 wi

@@ -154,7 +154,7 @@ Minimum number of gene copies in >= 1 genome (for selecting multi-copy gene clus
 =item -annotation  <char>
 
 Filter out any clusters where ALL pegs have provided annotations. 
-(comma delimited list; 'DEFAULT' = "conserved protein, hypothetical, predicted"). [ ]
+(comma delimited list; 'DEFAULT' = "conserved protein, conserved domain protein, hypothetical, predicted"). [ ]
 
 =item -verbose  <bool>
 
@@ -179,32 +179,4 @@ A gene cluster will only be removed due to 'bad' annotations
 if all of the genes in the cluster have the same annotation.
 
 Capitalization does not matter for filtering words. The annotation
-must just contain any of the words provided in at least part of
-the annotation.
-
-=head1 EXAMPLES
-
-=head2 Usage: filtering by length (>= 300bp)
-
-db_filterGeneInfoTable.pl -l 300 < gene_info.txt > filtered_gene_info.txt
-
-=head2 Usage: filtering by anntotation "hypothetical"
-
-db_filterGeneInfoTable.pl -a hypothetical < gene_info.txt > filtered_gene_info.txt
-
-
-=head1 AUTHOR
-
-Nick Youngblut <nyoungb2@illinois.edu>
-
-=head1 AVAILABILITY
-
-sharchaea.life.uiuc.edu:/home/git/FORAGer/
-
-=head1 COPYRIGHT
-
-Copyright 2010, 2011
-This software is licensed under the terms of the GPLv3
-
-=cut
-
+must j
